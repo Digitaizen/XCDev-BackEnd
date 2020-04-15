@@ -123,7 +123,8 @@ function testFunction() {
       })
       .then(function(systemData) {
         redfishDataObject[systemKey] = systemData;
-        redfishDataObject = JSON.stringify(redfishDataObject);
+        // redfishDataObject = JSON.stringify(redfishDataObject);
+        // redfishDataObject = v1Data;
 
         return db
           .collection("servers")
@@ -147,6 +148,7 @@ function testFunction() {
             } else {
               db.collection("servers").insertOne(
                 { ip: item, data: redfishDataObject },
+                { checkKeys: false },
                 (err, res) => {
                   if (err) {
                     return console.log(err);
@@ -173,12 +175,13 @@ async function getAllData() {
     .find()
     .toArray();
 
-  let reformattedResult = result.map(obj => {
-    obj.data = JSON.parse(obj.data);
-    return obj;
-  });
+  // let reformattedResult = result.map(obj => {
+  //   obj.data = JSON.parse(obj.data);
+  //   return obj;
+  // });
 
-  return reformattedResult;
+  // return reformattedResult;
+  return result;
 
   // return res;
 
@@ -210,7 +213,13 @@ testFunction();
 // setTimeout(function() {
 //   console.log(getAllData());
 // }, 10000);
+
 getAllData().then(function(results) {
   console.log(results);
+  console.log(
+    "Here's 100.80.146.97's redfish version: ",
+    results[0].data.v1.RedfishVersion
+  );
 });
+
 // console.log(results);
