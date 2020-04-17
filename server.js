@@ -7,38 +7,61 @@ const fetch = require("node-fetch");
 const base64 = require("base-64");
 const https = require("https");
 const express = require("express");
+// const MongoClient = require("mongodb").MongoClient;
+const mongoUtil = require("./mongoUtil");
 const app = express();
 
 // Defining the directory where express will serve the website
 app.use(express.static("public"));
 
-// Global MongoDB database variable
+// Local monogodb database session
+// const url = "mongodb://localhost:27017";
 let db;
 
-/**
- * FUNCTION DEFINITIONS
- */
+// Establish mongoclient and start the server on port 8080
+// MongoClient.connect(url, { useUnifiedTopology: true }, function(err, client) {
+//   console.log("Connected successfully to server");
+//   db = client.db("nodeExpressMongo");
 
-/**
- * Makes connection to local MongoDB and defines global db variable
- */
-async function dbConnection() {
-  const MongoClient = require("mongodb").MongoClient;
-  const url = "mongodb://localhost:27017";
+//   app.listen(8080, (req, res) => {
+//     console.log("listening on 8080");
+//   });
+// });
 
-  // Establish mongoclient and start the server on port 8080
-  const mongoConnect = await MongoClient.connect(url, {
-    useUnifiedTopology: true
+mongoUtil.connectToServer(function(err, client) {
+  if (err) console.log(err);
+  db = mongoUtil.getDb();
+});
+
+const fetch_retry = (url, options, n) =>
+  fetch(url, options, {
+    method: "GET"
+  }).catch(function(error) {
+    if (n === 1) throw error;
+    return fetch_retry(url, options, n - 1);
   });
 
-  // Defines global db variable to be nodeExpressMongo collection
-  db = mongoConnect.db("nodeExpressMongo");
-}
+app.listen(8080, (req, res) => {
+  console.log("listening on 8080");
+});
 
-/**
- * Updates MongoDB collection with data from iDRAC Redfish API
- */
-function getRedfishData() {
+// async function dbConnection() {
+//   const MongoClient = require("mongodb").MongoClient;
+//   const url = "mongodb://localhost:27017";
+
+//   // Establish mongoclient and start the server on port 8080
+//   const mongoConnect = await MongoClient.connect(url, {
+//     useUnifiedTopology: true
+//   });
+
+//   // Defines global db variable to be nodeExpressMongo collection
+//   db = mongoConnect.db("nodeExpressMongo");
+// }
+
+async function getRedfishData() {
+  // Wait for connection to MongoDB server to be made
+  // const res = await dbConnection();
+
   // List of hard-coded iDRAC IPs for testing
   let idracIps = ["100.80.146.94", "100.80.146.97", "100.80.146.100"];
 
@@ -72,9 +95,7 @@ function getRedfishData() {
     };
 
     // Make fetch call on v1 URL
-    fetch(v1Url, options, {
-      method: "GET"
-    })
+    fetch_retry(v1Url, options, 3)
       .then(function(response) {
         if (response.ok) {
           return response.json();
@@ -87,9 +108,7 @@ function getRedfishData() {
         redfishDataObject[v1Key] = v1Data;
 
         // Make fetch call on systems URL
-        return fetch(systemUrl, options, {
-          method: "GET"
-        });
+        return fetch_retry(systemUrl, options, 3);
       })
       .then(function(response) {
         if (response.ok) {
@@ -142,14 +161,9 @@ function getRedfishData() {
   });
 }
 
-/**
- * Retrieves all data from MongoDB collection & returns it as an array
- *
- * @return {array} array of JSON objects, each representing a single iDRAC's data
- */
 async function getMongoData() {
   // Wait for connection to MongoDB server to be made
-  const res = await dbConnection();
+  // const res = await dbConnection();
 
   let result = await db
     .collection("servers")
@@ -159,21 +173,27 @@ async function getMongoData() {
   return result;
 }
 
-/**
- * FUNCTION CALLS
- */
+// Default reply for home page
+app.get("/", (req, res) => {
+  res.sendFile(__dirname + "/index.html");
+});
 
-// Update MongoDB collection with data from iDRAC Redfish API
-getRedfishData();
+// Make public API call to jsonPlaceholder for users and save the response data in database
+app.post("/postServers", (req, res) => {
+  return getRedfishData();
+});
 
-// Retrieve all data from MongoDB collection & return it as an array
-getMongoData().then(function(results) {
-  // Print array to console
-  console.log(results);
+app.get("/getServers", (req, res) => {
+  getMongoData().then(function(results) {
+    // Print array to console
+    console.log(results);
 
-  // Demonstrate array parsing by printing 1 iDRAC's redfish version
-  console.log(
-    "Here's 100.80.146.97's redfish version: ",
-    results[0].data.v1.RedfishVersion
-  );
+    // Demonstrate array parsing by printing 1 iDRAC's redfish version
+    console.log(
+      "Here's 100.80.146.97's redfish version: ",
+      results[0].data.v1.RedfishVersion
+    );
+
+    return results;
+  });
 });
