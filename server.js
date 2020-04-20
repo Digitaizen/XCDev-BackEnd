@@ -171,12 +171,19 @@ app.post("/postServers", (req, res) => {
 app.get("/getServers", (req, res) => {
   getMongoData().then(function(results) {
     // Print array to console
-    console.log(results);
+    console.log(JSON.stringify(results, null, 2));
 
-    // Demonstrate array parsing by printing 1 iDRAC's redfish version
+    // Demonstrate array parsing by extracting relevant data using map()
     console.log(
-      "Here's 100.80.146.97's redfish version: ",
-      results[0].data.v1.RedfishVersion
+      "Here's data for all server in the database: ",
+      results.map(item => {
+        return {
+          Ip: item.ip,
+          ServiceTag: item.data.System.SKU,
+          Model: item.data.System.Model,
+          HostName: item.data.System.HostName
+        };
+      })
     );
 
     return results;
