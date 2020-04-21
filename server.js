@@ -8,6 +8,9 @@ const base64 = require("base-64");
 const https = require("https");
 const express = require("express");
 const mongoUtil = require("./mongoUtil");
+// const lineReader = require("line-reader");
+const fs = require("fs");
+const readline = require("readline");
 const app = express();
 
 // Global MongoDB database variable
@@ -34,12 +37,38 @@ const fetch_retry = (url, options, n) =>
   });
 
 /**
- * Updates MongoDB collection with data from iDRAC Redfish API
+ * Reads from text file containing IP addresses of active iDRACs and stores them in an array
+ *
+ * @return {array} array containing the IP addresses of active iDRACs
  */
-async function getRedfishData() {
-  // List of hard-coded iDRAC IPs for testing
-  let idracIps = ["100.80.146.94", "100.80.146.97", "100.80.146.100"];
+async function readIpTextFile() {
+  // Connect stream to text file
+  const fileStream = fs.createReadStream(
+    "C:/Users/Administrator/Documents/Bitbucket/xcwebappback/active_iDRAC_ips.txt"
+  );
+  // Declare empty array
+  let idracIps = [];
 
+  // Define interface for reading from stream
+  const rl = readline.createInterface({
+    input: fileStream,
+    crlfDelay: Infinity
+  });
+
+  // Wait for each line in the text file to be read
+  for await (const line of rl) {
+    idracIps.push(line);
+  }
+
+  return idracIps;
+}
+
+/**
+ * Updates MongoDB collection with data from iDRAC Redfish API
+ *
+ * @param {array} idracIps array containing IP addresses of active iDRACs
+ */
+async function getRedfishData(idracIps) {
   // Iterate through iDRAC IPs
   idracIps.forEach(function(item, index) {
     // Declare object that will store the iDRAC's data
@@ -165,9 +194,12 @@ app.get("/", (req, res) => {
 
 // Make call to iDRAC Redfish API and save the response data in MongoDB collection
 app.post("/postServers", (req, res) => {
-  return getRedfishData();
+  return readIpTextFile().then(function(idracIps) {
+    return getRedfishData(idracIps);
+  });
 });
 
+// Get collection data from MongoDB and return relevant data
 app.get("/getServers", (req, res) => {
   getMongoData().then(function(results) {
     // Print array to console
