@@ -173,19 +173,17 @@ app.get("/getServers", (req, res) => {
     // Print array to console
     console.log(JSON.stringify(results, null, 2));
 
-    // Demonstrate array parsing by extracting relevant data using map()
-    console.log(
-      "Here's data for all server in the database: ",
-      results.map(item => {
-        return {
-          Ip: item.ip,
-          ServiceTag: item.data.System.SKU,
-          Model: item.data.System.Model,
-          HostName: item.data.System.HostName
-        };
-      })
-    );
+    // Extract relevant data using map()
+    results = results.map(item => {
+      return {
+        Ip: item.ip,
+        ServiceTag: item.data.System.SKU,
+        Model: item.data.System.Model,
+        HostName: item.data.System.HostName
+      };
+    });
 
-    return results;
+    // return results;
+    res.send(results);
   });
 });

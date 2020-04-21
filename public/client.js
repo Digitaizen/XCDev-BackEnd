@@ -30,9 +30,12 @@ readButton.addEventListener("click", function(e) {
     .then(function(response) {
       if (response.ok) {
         console.log("server data retrieved");
-        return;
+        return response.json();
       }
       throw new Error("Request Failed");
+    })
+    .then(function(data) {
+      document.getElementById("results").innerHTML = `${JSON.stringify(data)}`;
     })
     .catch(function(error) {
       console.log(error);
