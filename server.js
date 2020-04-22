@@ -8,13 +8,13 @@ const base64 = require("base-64");
 const https = require("https");
 const express = require("express");
 const mongoUtil = require("./mongoUtil");
-// const lineReader = require("line-reader");
 const fs = require("fs");
 const readline = require("readline");
 const app = express();
 
 // Global MongoDB database variable
 let db;
+let serverCount;
 
 // Establish connection to local MongoDB server
 mongoUtil.connectToServer(function(err, client) {
@@ -69,6 +69,9 @@ async function readIpTextFile() {
  * @param {array} idracIps array containing IP addresses of active iDRACs
  */
 async function getRedfishData(idracIps) {
+  // Initialize count of servers being added/updated to db
+  serverCount = 0;
+
   // Iterate through iDRAC IPs
   idracIps.forEach(function(item, index) {
     // Declare object that will store the iDRAC's data
@@ -141,7 +144,9 @@ async function getRedfishData(idracIps) {
                   if (err) {
                     return console.log(err);
                   }
+                  serverCount++;
                   console.log("Server updated in db");
+                  console.log("Server #", serverCount);
                 }
               );
               // If no entry with the same iDRAC IP is found, add a new entry
@@ -153,7 +158,9 @@ async function getRedfishData(idracIps) {
                   if (err) {
                     return console.log(err);
                   }
+                  serverCount++;
                   console.log("Server added to db");
+                  console.log("Server #", serverCount);
                 }
               );
             }
@@ -194,6 +201,8 @@ app.get("/", (req, res) => {
 
 // Make call to iDRAC Redfish API and save the response data in MongoDB collection
 app.post("/postServers", (req, res) => {
+  res.connection.setTimeout(0);
+
   return readIpTextFile().then(function(idracIps) {
     return getRedfishData(idracIps);
   });
@@ -203,7 +212,7 @@ app.post("/postServers", (req, res) => {
 app.get("/getServers", (req, res) => {
   getMongoData().then(function(results) {
     // Print array to console
-    console.log(JSON.stringify(results, null, 2));
+    // console.log(JSON.stringify(results, null, 2));
 
     // Extract relevant data using map()
     results = results.map(item => {
