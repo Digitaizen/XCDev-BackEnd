@@ -35,7 +35,18 @@ readButton.addEventListener("click", function(e) {
       throw new Error("Request Failed");
     })
     .then(function(data) {
-      document.getElementById("results").innerHTML = `${JSON.stringify(data)}`;
+      data.forEach(item => {
+        var node = document.createElement("LI");
+        var textNode = document.createTextNode(
+          String(
+            `IP: ${item.Ip},\t Service Tag: ${item.ServiceTag},\t Model: ${item.Model},\t Host Name: ${item.HostName}`
+          )
+        );
+        node.appendChild(textNode);
+        document.getElementById("serverList").appendChild(node);
+      });
+
+      // document.getElementById("results").innerHTML = `${JSON.stringify(data)}`;
     })
     .catch(function(error) {
       console.log(error);
