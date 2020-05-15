@@ -3,52 +3,50 @@ console.log("Client side code running");
 const fetchButton = document.querySelector(".buttonFetch");
 const readButton = document.querySelector(".buttonRead");
 
-fetchButton.addEventListener("click", function(e) {
+fetchButton.addEventListener("click", () => {
   console.log("Fetch button clicked");
 
   fetch("/postServers", {
-    method: "POST"
+    method: "POST",
   })
-    .then(function(response) {
+    .then((response) => {
       if (response.ok) {
         console.log("server data added");
         return;
       }
       throw new Error("Request Failed");
     })
-    .catch(function(error) {
+    .catch((error) => {
       console.log(error);
     });
 });
 
-readButton.addEventListener("click", function(e) {
+readButton.addEventListener("click", () => {
   console.log("Read button clicked");
 
   fetch("/getServers", {
-    method: "GET"
+    method: "GET",
   })
-    .then(function(response) {
+    .then((response) => {
       if (response.ok) {
         console.log("server data retrieved");
         return response.json();
       }
       throw new Error("Request Failed");
     })
-    .then(function(data) {
-      data.forEach(item => {
+    .then((data) => {
+      data.map((item) => {
         var node = document.createElement("LI");
         var textNode = document.createTextNode(
           String(
-            `IP: ${item.Ip},\t Service Tag: ${item.ServiceTag},\t Model: ${item.Model},\t Host Name: ${item.HostName}`
+            `IP: ${item.ip},\t Service Tag: ${item.serviceTag},\t Model: ${item.model},\t Host Name: ${item.hostname}`
           )
         );
         node.appendChild(textNode);
         document.getElementById("serverList").appendChild(node);
       });
-
-      // document.getElementById("results").innerHTML = `${JSON.stringify(data)}`;
     })
-    .catch(function(error) {
+    .catch((error) => {
       console.log(error);
     });
 });
