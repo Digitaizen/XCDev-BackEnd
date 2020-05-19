@@ -206,6 +206,85 @@ function getMongoData(db) {
   return result;
 }
 
+/**
+ * Determines if email and password fields contain valid/non-empty input
+ *
+ * @param {JSON} data JSON object containing login info submitted by user
+ */
+function validateLoginInput(data) {
+  let errors = {};
+
+  // Convert empty fields to an empty string so we can use validator functions
+  data.email = !isEmpty(data.email) ? data.email : "";
+  data.password = !isEmpty(data.password) ? data.password : "";
+
+  // Email checks
+  if (Validator.isEmpty(data.email)) {
+    errors.email = "Email field is required";
+  } else if (!Validator.isEmail(data.email)) {
+    errors.email = "Email is invalid";
+  }
+
+  // Password checks
+  if (Validator.isEmpty(data.password)) {
+    errors.password = "Password field is required";
+  }
+
+  return {
+    errors,
+    isValid: isEmpty(errors)
+  };
+}
+
+/**
+ * Determines if registration fields contain valid/non-empty input
+ *
+ * @param {JSON} data JSON object containing registration info submitted by user
+ */
+function validateRegisterInput(data) {
+  let errors = {};
+
+  // Convert empty fields to an empty string so we can use validator functions
+  // data.name = !isEmpty(data.name) ? data.name : "";
+  data.email = !isEmpty(data.email) ? data.email : "";
+  data.password = !isEmpty(data.password) ? data.password : "";
+  // data.password2 = !isEmpty(data.password2) ? data.password2 : "";
+
+  // Name checks
+  // if (Validator.isEmpty(data.name)) {
+  //   errors.name = "Name field is required";
+  // }
+
+  // Email checks
+  if (Validator.isEmpty(data.email)) {
+    errors.email = "Email field is required";
+  } else if (!Validator.isEmail(data.email)) {
+    errors.email = "Email is invalid";
+  }
+
+  // Password checks
+  if (Validator.isEmpty(data.password)) {
+    errors.password = "Password field is required";
+  }
+
+  // if (Validator.isEmpty(data.password2)) {
+  //   errors.password2 = "Confirm password field is required";
+  // }
+
+  if (!Validator.isLength(data.password, { min: 6, max: 30 })) {
+    errors.password = "Password must be at least 6 characters";
+  }
+
+  // if (!Validator.equals(data.password, data.password2)) {
+  //   errors.password2 = "Passwords must match";
+  // }
+
+  return {
+    errors,
+    isValid: isEmpty(errors)
+  };
+}
+
 // Launch the server //////////////////////////////////////////////////////////
 console.log("Launching the backend server..");
 
@@ -229,6 +308,134 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
     // Default reply for home page
     app.get("/", (req, res) => {
       res.sendFile(__dirname + "/index.html");
+    });
+
+    // Define opts for strategy
+    const opts = {};
+    opts.jwtFromRequest = ExtractJwt.fromAuthHeaderAsBearerToken();
+    opts.secretOrKey = keys.secretOrKey;
+
+    // Define strategy for passport instance
+    passport.use(
+      new JwtStrategy(opts, (jwt_payload, done) => {
+        _db
+          .collection(dbColl_Users)
+          .findOne({ _id: jwt_payload.id })
+          .then(user => {
+            if (user) {
+              return done(null, user);
+            }
+            return done(null, false);
+          })
+          .catch(err => console.log(err));
+      })
+    );
+
+    // Initialize passport instance
+    app.use(passport.initialize());
+
+    // Allow parsing of res.body
+    app.use(
+      bodyParser.urlencoded({
+        extended: true
+      })
+    );
+
+    app.use(bodyParser.json());
+
+    // Accept valid login credentials and return a JSON web token
+    app.post("/login", (req, res) => {
+      // Form validation
+      const { errors, isValid } = validateLoginInput(req.body);
+
+      // Check validation
+      if (!isValid) {
+        return res.status(400).json(errors);
+      }
+
+      // If user exists and password is correct, return a success token
+      _db
+        .collection(dbColl_Users)
+        .findOne({ email: req.body.email })
+        .then(user => {
+          // Check if user exists
+          if (!user) {
+            return res.status(404).json({ emailnotfound: "Email not found" });
+          }
+
+          // Check password
+          bcrypt.compare(req.body.password, user.password).then(isMatch => {
+            if (isMatch) {
+              // User matched
+              // Create JWT Payload
+              const payload = {
+                id: user.id,
+                name: user.name
+              };
+
+              // Sign token
+              jwt.sign(
+                payload,
+                keys.secretOrKey,
+                {
+                  expiresIn: 31556926 // 1 year in seconds
+                },
+                (err, token) => {
+                  res.json({
+                    success: true,
+                    token: "Bearer " + token
+                  });
+                }
+              );
+            } else {
+              return res
+                .status(400)
+                .json({ passwordincorrect: "Password incorrect" });
+            }
+          });
+        });
+    });
+
+    // Add new user credentials to users collection and return credentials as JSON
+    app.post("/register", async (req, res) => {
+      // Form validation
+      const { errors, isValid } = validateRegisterInput(req.body);
+
+      // Check validation
+      if (!isValid) {
+        return res.status(400).json(errors);
+      }
+
+      // Create hashed password
+      const hashedPassword = await bcrypt.hash(req.body.password, 10);
+
+      try {
+        // Check if email is already in use; if not, create new user record in collection
+        _db
+          .collection(dbColl_Users)
+          .findOne({ email: req.body.email })
+          .then(user => {
+            if (user) {
+              return res.status(400).json({ email: "Email already exists" });
+            } else {
+              _db
+                .collection(dbColl_Users)
+                .insertOne(
+                  {
+                    name: req.body.name,
+                    email: req.body.email,
+                    password: hashedPassword
+                  },
+                  { checkKeys: false }
+                )
+                .then(user => res.json(user.ops[0]))
+                .catch(err => console.log(err));
+              console.log("You're registered! Now login");
+            }
+          });
+      } catch {
+        console.log("There was an error while registering");
+      }
     });
 
     // Make call to iDRAC Redfish API and save the response data in MongoDB collection
