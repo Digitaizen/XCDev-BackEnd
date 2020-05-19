@@ -10,11 +10,22 @@ const https = require("https");
 const fetch = require("node-fetch");
 const fs = require("fs");
 const express = require("express");
+const bcrypt = require("bcrypt");
+const passport = require("passport");
+const jwt = require("jsonwebtoken");
+const bodyParser = require("body-parser");
+const JwtStrategy = require("passport-jwt").Strategy;
+const ExtractJwt = require("passport-jwt").ExtractJwt;
+const keys = require("./config/keys");
+const Validator = require("validator");
+const isEmpty = require("is-empty");
 
 // Declare the globals ////////////////////////////////////////////////////////
 const dbUrl = "mongodb://localhost:27017";
-const dbName = "nodeExpressMongo";
-const dbColl_Servers = "testServers";
+const dbName = "dev";
+const dbColl_Servers = "servers";
+const dbColl_Users = "users";
+const dbColl_Counters = "counters";
 const portNum = 8080;
 const ipFile = "./active_iDRAC_ips.txt";
 const iDracLogin = "root";
@@ -37,7 +48,7 @@ function readIpFile(fName) {
  * @return {Number} counter value used as _id in latest servers collection entry
  */
 function getNextSequence(db, name, callback) {
-  db.collection("counters").findAndModify(
+  db.collection(dbColl_Counters).findAndModify(
     { _id: name },
     null,
     { $inc: { seq: 1 } },
