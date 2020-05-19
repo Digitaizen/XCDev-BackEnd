@@ -32,13 +32,30 @@ function readIpFile(fName) {
 }
 
 /**
+ * Increases counter variable by 1
+ *
+ * @return {Number} counter value used as _id in latest servers collection entry
+ */
+function getNextSequence(db, name, callback) {
+  db.collection("counters").findAndModify(
+    { _id: name },
+    null,
+    { $inc: { seq: 1 } },
+    function(err, result) {
+      if (err) callback(err, result);
+      callback(err, result.value.seq);
+    }
+  );
+}
+
+/**
  * Performs fetch call to "url", allows "n" retries before returning error
  * @return {Response} response containing data from the url
  */
 const fetch_retry = (url, options, n) =>
   fetch(url, options, {
-    method: "GET",
-  }).catch((error) => {
+    method: "GET"
+  }).catch(error => {
     if (n === 1) throw error;
     return fetch_retry(url, options, n - 1);
   });
@@ -52,7 +69,7 @@ async function getRedfishData(idracIps, db) {
   let serverCount = 0;
 
   // Iterate through iDRAC IPs
-  idracIps.forEach((item) => {
+  idracIps.forEach(item => {
     // Declare object that will store the iDRAC's data
     let redfishDataObject = {};
 
@@ -62,7 +79,7 @@ async function getRedfishData(idracIps, db) {
 
     // Construct options to be used in fetch call
     const agent = new https.Agent({
-      rejectUnauthorized: false,
+      rejectUnauthorized: false
     });
 
     let options = {
@@ -71,35 +88,35 @@ async function getRedfishData(idracIps, db) {
         "Content-Type": "application/json",
         Authorization: `Basic ${base64.encode(
           `${iDracLogin}:${iDracPassword}`
-        )}`,
+        )}`
       },
-      agent: agent,
+      agent: agent
     };
 
     // Make fetch call on v1 URL
     fetch_retry(v1Url, options, 3)
-      .then((response) => {
+      .then(response => {
         if (response.ok) {
           return response.json();
         } else {
           return Promise.reject(response);
         }
       })
-      .then((v1Data) => {
+      .then(v1Data => {
         // Store data from v1 URL in iDRAC data object
         redfishDataObject["v1"] = v1Data;
 
         // Make fetch call on systems URL
         return fetch_retry(systemUrl, options, 3);
       })
-      .then((response) => {
+      .then(response => {
         if (response.ok) {
           return response.json();
         } else {
           return Promise.reject(response);
         }
       })
-      .then((systemData) => {
+      .then(systemData => {
         // Store data from systems URL in iDRAC data object
         redfishDataObject["System"] = systemData;
 
@@ -119,10 +136,10 @@ async function getRedfishData(idracIps, db) {
                     ip: item,
                     serviceTag: redfishDataObject.System.SKU,
                     model: redfishDataObject.System.Model,
-                    hostname: redfishDataObject.System.HostName,
-                  },
+                    hostname: redfishDataObject.System.HostName
+                  }
                 },
-                (err) => {
+                err => {
                   if (err) {
                     return console.log(err);
                   }
@@ -134,26 +151,33 @@ async function getRedfishData(idracIps, db) {
               );
               // If no entry with the same iDRAC IP is found, add a new entry
             } else {
-              db.collection(dbColl_Servers).insertOne(
-                {
-                  ip: item,
-                  serviceTag: redfishDataObject.System.SKU,
-                  model: redfishDataObject.System.Model,
-                  hostname: redfishDataObject.System.HostName,
-                },
-                { checkKeys: false },
-                (err) => {
-                  if (err) {
-                    return console.log(err);
-                  }
-                  serverCount++;
-                  console.log(`Server # ${serverCount} @ ${item} added to db`);
+              getNextSequence(db, "serverId", function(err, result) {
+                if (!err) {
+                  db.collection(dbColl_Servers).insertOne(
+                    {
+                      _id: result,
+                      ip: item,
+                      serviceTag: redfishDataObject.System.SKU,
+                      model: redfishDataObject.System.Model,
+                      hostname: redfishDataObject.System.HostName,
+                      status: "checkOut"
+                    },
+                    { checkKeys: false },
+                    (err, res) => {
+                      if (err) {
+                        return console.log(err);
+                      }
+                      serverCount++;
+                      console.log("Server added to db");
+                      console.log("Server #", serverCount);
+                    }
+                  );
                 }
-              );
+              });
             }
           });
       })
-      .catch((error) => {
+      .catch(error => {
         console.warn(error);
       });
   });
@@ -164,7 +188,10 @@ async function getRedfishData(idracIps, db) {
  * @return {array} array of JSON objects, each representing a single iDRAC's data
  */
 function getMongoData(db) {
-  let result = db.collection(dbColl_Servers).find().toArray();
+  let result = db
+    .collection(dbColl_Servers)
+    .find()
+    .toArray();
   return result;
 }
 
@@ -176,7 +203,7 @@ const app = express();
 
 // Connect to the database, start the server, query iDRACs via RedFish, and populate db
 MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
-  (client) => {
+  client => {
     const _db = client.db(dbName);
     console.log(`Connected to ${dbName}`);
 
@@ -204,7 +231,7 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
 
     // Get collection data from MongoDB and return relevant data
     app.get("/getServers", (req, res) => {
-      getMongoData(_db).then((results) => {
+      getMongoData(_db).then(results => {
         res.send(results);
       });
     });
