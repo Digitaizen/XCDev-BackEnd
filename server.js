@@ -171,7 +171,7 @@ async function getRedfishData(idracIps, db) {
                       serviceTag: redfishDataObject.System.SKU,
                       model: redfishDataObject.System.Model,
                       hostname: redfishDataObject.System.HostName,
-                      status: "checkOut"
+                      status: "CheckOut"
                     },
                     { checkKeys: false },
                     (err, res) => {
@@ -471,7 +471,7 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
         );
     });
 
-    app.patch("/patchServers/:id", (req, res) => {
+    app.patch("/patchStatus/:id", (req, res) => {
       _db.collection(dbColl_Servers).updateOne(
         { _id: parseInt(req.params.id) },
         {
