@@ -21,7 +21,7 @@ const Validator = require("validator");
 const isEmpty = require("is-empty");
 
 // Declare the globals ////////////////////////////////////////////////////////
-const dbUrl = "mongodb://localhost:27017";
+const dbUrl = "mongodb://admin:raid4us!@localhost:27017";
 const dbName = "dev";
 const dbColl_Servers = "servers";
 const dbColl_Users = "users";
@@ -453,5 +453,13 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
         res.send(results);
       });
     });
+
+    app.get("/status/:id", (req, res) => {
+      getMongoData(_db).then(results => {
+        res.send(results);
+      });
+    });
+
+    app.patch("/patchServers/:id", (req, res) => {});
   }
 );
