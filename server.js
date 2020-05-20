@@ -462,11 +462,31 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
           { _id: parseInt(req.params.id) },
           { projection: { status: 1, _id: 0 } },
           (err, results) => {
-            res.json(results);
+            if (err) {
+              res.status(500).send(err);
+            } else {
+              res.json(results);
+            }
           }
         );
     });
 
-    app.patch("/patchServers/:id", (req, res) => {});
+    app.patch("/patchServers/:id", (req, res) => {
+      _db.collection(dbColl_Servers).updateOne(
+        { _id: parseInt(req.params.id) },
+        {
+          $set: {
+            status: req.body.status
+          }
+        },
+        (err, results) => {
+          if (err) {
+            res.status(500).send(err);
+          } else {
+            res.status(200).send(results);
+          }
+        }
+      );
+    });
   }
 );
