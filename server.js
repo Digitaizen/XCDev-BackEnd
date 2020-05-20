@@ -21,7 +21,8 @@ const Validator = require("validator");
 const isEmpty = require("is-empty");
 
 // Declare the globals ////////////////////////////////////////////////////////
-const dbUrl = "mongodb://admin:raid4us!@localhost:27017";
+// const dbUrl = "mongodb://admin:raid4us!@localhost:27017";
+const dbUrl = "mongodb://localhost:27017";
 const dbName = "dev";
 const dbColl_Servers = "servers";
 const dbColl_Users = "users";
@@ -454,10 +455,17 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
       });
     });
 
+    // Get status value of server that has specified id
     app.get("/status/:id", (req, res) => {
-      getMongoData(_db).then(results => {
-        res.send(results);
-      });
+      _db
+        .collection(dbColl_Servers)
+        .findOne(
+          { _id: parseInt(req.params.id) },
+          { projection: { status: 1, _id: 0 } },
+          (err, results) => {
+            res.json(results);
+          }
+        );
     });
 
     app.patch("/patchServers/:id", (req, res) => {});
