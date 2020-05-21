@@ -207,7 +207,7 @@ function getMongoData(db) {
 }
 
 /**
- * Determines if email and password fields contain valid/non-empty input
+ * Determines if username and password fields contain valid/non-empty input
  *
  * @param {JSON} data JSON object containing login info submitted by user
  */
@@ -215,14 +215,12 @@ function validateLoginInput(data) {
   let errors = {};
 
   // Convert empty fields to an empty string so we can use validator functions
-  data.email = !isEmpty(data.email) ? data.email : "";
+  data.username = !isEmpty(data.username) ? data.username : "";
   data.password = !isEmpty(data.password) ? data.password : "";
 
-  // Email checks
-  if (Validator.isEmpty(data.email)) {
-    errors.email = "Email field is required";
-  } else if (!Validator.isEmail(data.email)) {
-    errors.email = "Email is invalid";
+  // Username checks
+  if (Validator.isEmpty(data.username)) {
+    errors.email = "Username field is required";
   }
 
   // Password checks
@@ -245,21 +243,27 @@ function validateRegisterInput(data) {
   let errors = {};
 
   // Convert empty fields to an empty string so we can use validator functions
-  // data.name = !isEmpty(data.name) ? data.name : "";
+  data.name = !isEmpty(data.name) ? data.name : "";
   data.email = !isEmpty(data.email) ? data.email : "";
+  data.username = !isEmpty(data.username) ? data.username : "";
   data.password = !isEmpty(data.password) ? data.password : "";
   // data.password2 = !isEmpty(data.password2) ? data.password2 : "";
 
   // Name checks
-  // if (Validator.isEmpty(data.name)) {
-  //   errors.name = "Name field is required";
-  // }
+  if (Validator.isEmpty(data.name)) {
+    errors.name = "Name field is required";
+  }
 
   // Email checks
   if (Validator.isEmpty(data.email)) {
     errors.email = "Email field is required";
   } else if (!Validator.isEmail(data.email)) {
     errors.email = "Email is invalid";
+  }
+
+  // Username checks
+  if (Validator.isEmpty(data.username)) {
+    errors.name = "Username field is required";
   }
 
   // Password checks
@@ -356,43 +360,43 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
       // If user exists and password is correct, return a success token
       _db
         .collection(dbColl_Users)
-        .findOne({ email: req.body.email })
+        .findOne({ username: req.body.username })
         .then(user => {
           // Check if user exists
           if (!user) {
-            return res.status(404).json({ emailnotfound: "Email not found" });
+            return res
+              .status(404)
+              .json({ emailnotfound: "Username not found" });
           }
 
           // Check password
-          bcrypt.compare(req.body.password, user.password).then(isMatch => {
-            if (isMatch) {
-              // User matched
-              // Create JWT Payload
-              const payload = {
-                id: user.id,
-                name: user.name
-              };
+          if (user.password == req.body.password) {
+            // User matched
+            // Create JWT Payload
+            const payload = {
+              id: user.id,
+              name: user.name
+            };
 
-              // Sign token
-              jwt.sign(
-                payload,
-                keys.secretOrKey,
-                {
-                  expiresIn: 31556926 // 1 year in seconds
-                },
-                (err, token) => {
-                  res.json({
-                    success: true,
-                    token: "Bearer " + token
-                  });
-                }
-              );
-            } else {
-              return res
-                .status(400)
-                .json({ passwordincorrect: "Password incorrect" });
-            }
-          });
+            // Sign token
+            jwt.sign(
+              payload,
+              keys.secretOrKey,
+              {
+                expiresIn: 31556926 // 1 year in seconds
+              },
+              (err, token) => {
+                res.json({
+                  success: true,
+                  token: "Bearer " + token
+                });
+              }
+            );
+          } else {
+            return res
+              .status(400)
+              .json({ passwordincorrect: "Password incorrect" });
+          }
         });
     });
 
@@ -407,7 +411,7 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
       }
 
       // Create hashed password
-      const hashedPassword = await bcrypt.hash(req.body.password, 10);
+      // const hashedPassword = await bcrypt.hash(req.body.password, 10);
 
       try {
         // Check if email is already in use; if not, create new user record in collection
@@ -424,7 +428,8 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
                   {
                     name: req.body.name,
                     email: req.body.email,
-                    password: hashedPassword
+                    username: req.body.username,
+                    password: req.body.password
                   },
                   { checkKeys: false }
                 )
