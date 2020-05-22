@@ -21,7 +21,7 @@ const Validator = require("validator");
 const isEmpty = require("is-empty");
 
 // Declare the globals ////////////////////////////////////////////////////////
-const dbUrl = "mongodb://admin:raid4us!@localhost:27017";
+const dbUrl = "mongodb://mongoserv:raid4us!@localhost:27017";
 const dbName = "dev";
 const dbColl_Servers = "servers";
 const dbColl_Users = "users";
