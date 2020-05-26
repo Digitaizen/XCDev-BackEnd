@@ -496,5 +496,23 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
         }
       );
     });
+
+    app.patch("/patchComments/:id", (req, res) => {
+      _db.collection(dbColl_Servers).updateOne(
+        { _id: parseInt(req.params.id) },
+        {
+          $set: {
+            comments: req.body.comments
+          }
+        },
+        (err, results) => {
+          if (err) {
+            res.status(500).send(err);
+          } else {
+            res.status(200).send(results);
+          }
+        }
+      );
+    });
   }
 );
