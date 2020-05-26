@@ -171,7 +171,10 @@ async function getRedfishData(idracIps, db) {
                       serviceTag: redfishDataObject.System.SKU,
                       model: redfishDataObject.System.Model,
                       hostname: redfishDataObject.System.HostName,
-                      status: "CheckOut"
+                      status: "CheckOut",
+                      user: "",
+                      timestamp: "",
+                      comments: ""
                     },
                     { checkKeys: false },
                     (err, res) => {
