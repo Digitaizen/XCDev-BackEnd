@@ -130,6 +130,9 @@ async function getRedfishData(idracIps, db) {
       .then(systemData => {
         // Store data from systems URL in iDRAC data object
         redfishDataObject["System"] = systemData;
+        let systemGeneration = redfishDataObject.System.hasOwnProperty("Oem")
+          ? redfishDataObject.System.Oem.Dell.DellSystem.SystemGeneration
+          : "";
 
         // Add or update collection entry with iDRAC data object
         return db
@@ -147,7 +150,8 @@ async function getRedfishData(idracIps, db) {
                     ip: item,
                     serviceTag: redfishDataObject.System.SKU,
                     model: redfishDataObject.System.Model,
-                    hostname: redfishDataObject.System.HostName
+                    hostname: redfishDataObject.System.HostName,
+                    generation: systemGeneration
                   }
                 },
                 err => {
@@ -171,6 +175,7 @@ async function getRedfishData(idracIps, db) {
                       serviceTag: redfishDataObject.System.SKU,
                       model: redfishDataObject.System.Model,
                       hostname: redfishDataObject.System.HostName,
+                      generation: systemGeneration,
                       status: "CheckOut",
                       user: "",
                       timestamp: "",
