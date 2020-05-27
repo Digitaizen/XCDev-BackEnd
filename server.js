@@ -391,7 +391,8 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
               (err, token) => {
                 res.json({
                   success: true,
-                  token: "Bearer " + token
+                  token: "Bearer " + token,
+                  userInfo: user
                 });
               }
             );
