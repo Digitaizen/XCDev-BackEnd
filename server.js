@@ -19,9 +19,12 @@ const ExtractJwt = require("passport-jwt").ExtractJwt;
 const keys = require("./config/keys");
 const Validator = require("validator");
 const isEmpty = require("is-empty");
+const async = require("async");
+const nodemailer = require("nodemailer");
+const crypto = require("crypto");
 
 // Declare the globals ////////////////////////////////////////////////////////
-const dbUrl = "mongodb://mongoserv:raid4us!@localhost:27017";
+const dbUrl = "mongodb://localhost:27017";
 const dbName = "dev";
 const dbColl_Servers = "servers";
 const dbColl_Users = "users";
@@ -130,6 +133,7 @@ async function getRedfishData(idracIps, db) {
       .then(systemData => {
         // Store data from systems URL in iDRAC data object
         redfishDataObject["System"] = systemData;
+        // Define iDRAC generation if present in Systems URI
         let systemGeneration = redfishDataObject.System.hasOwnProperty("Oem")
           ? redfishDataObject.System.Oem.Dell.DellSystem.SystemGeneration
           : "";
@@ -378,34 +382,36 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
           }
 
           // Check password
-          if (user.password == req.body.password) {
-            // User matched
-            // Create JWT Payload
-            const payload = {
-              id: user.id,
-              name: user.name
-            };
+          bcrypt.compare(req.body.password, user.password).then(isMatch => {
+            if (isMatch) {
+              // User matched
+              // Create JWT Payload
+              const payload = {
+                id: user.id,
+                name: user.name
+              };
 
-            // Sign token
-            jwt.sign(
-              payload,
-              keys.secretOrKey,
-              {
-                expiresIn: 31556926 // 1 year in seconds
-              },
-              (err, token) => {
-                res.json({
-                  success: true,
-                  token: "Bearer " + token,
-                  userInfo: user
-                });
-              }
-            );
-          } else {
-            return res
-              .status(400)
-              .json({ passwordincorrect: "Password incorrect" });
-          }
+              // Sign token
+              jwt.sign(
+                payload,
+                keys.secretOrKey,
+                {
+                  expiresIn: 31556926 // 1 year in seconds
+                },
+                (err, token) => {
+                  res.json({
+                    success: true,
+                    token: "Bearer " + token,
+                    userInfo: user
+                  });
+                }
+              );
+            } else {
+              return res
+                .status(400)
+                .json({ passwordincorrect: "Password incorrect" });
+            }
+          });
         });
     });
 
@@ -420,7 +426,7 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
       }
 
       // Create hashed password
-      // const hashedPassword = await bcrypt.hash(req.body.password, 10);
+      const hashedPassword = await bcrypt.hash(req.body.password, 10);
 
       try {
         // Check if email is already in use; if not, create new user record in collection
@@ -438,7 +444,9 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
                     name: req.body.name,
                     email: req.body.email,
                     username: req.body.username,
-                    password: req.body.password
+                    password: hashedPassword,
+                    resetPasswordToken: "",
+                    resetPasswordExpires: ""
                   },
                   { checkKeys: false }
                 )
@@ -485,6 +493,7 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
         );
     });
 
+    // Patch status value of server that has specified id
     app.patch("/patchStatus/:id", (req, res) => {
       _db.collection(dbColl_Servers).updateOne(
         { _id: parseInt(req.params.id) },
@@ -503,6 +512,7 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
       );
     });
 
+    // Patch comments value of server that has specified id
     app.patch("/patchComments/:id", (req, res) => {
       _db.collection(dbColl_Servers).updateOne(
         { _id: parseInt(req.params.id) },
@@ -517,6 +527,186 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
           } else {
             res.status(200).send(results);
           }
+        }
+      );
+    });
+
+    // Send email to given address containing link to reset password
+    app.post("/forgot", (req, res) => {
+      async.waterfall(
+        [
+          function(done) {
+            // Create 20-character token to append to password-reset URL
+            crypto.randomBytes(20, function(err, buf) {
+              var token = buf.toString("hex");
+              done(err, token);
+            });
+            console.log("First function done");
+          },
+          function(token, done) {
+            _db
+              .collection(dbColl_Users)
+              .findOne({ email: req.body.email }, function(err, user) {
+                // Check for user with supplied email address
+                if (!user) {
+                  return res.status(400).json({
+                    email: "No account with that email address exists"
+                  });
+                }
+
+                // Define expiration of password-reset token
+                let expirationDate = Date.now() + 3600000;
+                console.log(expirationDate);
+
+                // Update user's password-reset token and token expiration
+                _db.collection(dbColl_Users).updateOne(
+                  { email: req.body.email },
+                  {
+                    $set: {
+                      resetPasswordToken: token,
+                      resetPasswordExpires: expirationDate
+                    }
+                  },
+                  function(err) {
+                    console.log("2nd function done");
+                    done(err, token, user);
+                  }
+                );
+              });
+          },
+          function(token, user, done) {
+            // Define smtp transport with gmail account used for sending password-reset URL's
+            var smtpTransport = nodemailer.createTransport({
+              host: "smtp.gmail.com",
+              port: 587,
+              secure: false,
+              auth: {
+                user: "labinventorypwreset@gmail.com",
+                pass: "raid4us!"
+              }
+            });
+            console.log("smtpTransport done");
+
+            // Define the content of the email being sent
+            var mailOptions = {
+              to: user.email,
+              from: "labinventorypwreset@gmail.com",
+              subject: "Lab Inventory Password Reset",
+              text:
+                "You are receiving this because you (or someone else) have requested the reset of the password for your account.\n\n" +
+                "Please click on the following link, or paste this into your browser to complete the process:\n\n" +
+                "http://" +
+                req.headers.host +
+                "/reset/" +
+                token +
+                "\n\n" +
+                "If you did not request this, please ignore this email and your password will remain unchanged.\n"
+            };
+            console.log("mailOptions done");
+
+            // Send the email
+            smtpTransport.sendMail(mailOptions, function(err) {
+              if (err) return console.log(err);
+              console.log(
+                "An email was sent to " +
+                  user.email +
+                  " with further instructions."
+              );
+              done(err, "done");
+            });
+            console.log("sendMail done");
+          }
+        ],
+        function(err) {
+          // Check for errors thrown by waterfall
+          if (err) return console.log(err);
+
+          // Send response to front-end to confirm the email was sent
+          res.json({ message: "password reset done" });
+        }
+      );
+    });
+
+    // Reset password of user with specified password-reset token
+    app.post("/reset/:token", (req, res) => {
+      async.waterfall(
+        [
+          // Check for valid password-reset token and confirm the token has not expired
+          function(done) {
+            _db.collection(dbColl_Users).findOne(
+              {
+                resetPasswordToken: req.params.token,
+                resetPasswordExpires: { $gt: Date.now() }
+              },
+              async function(err, user) {
+                if (!user) {
+                  return res.status(400).json({
+                    email: "Password reset token is invalid or has expired."
+                  });
+                }
+
+                // Encrypt the new password
+                const hashedPassword = await bcrypt.hash(req.body.password, 10);
+
+                // Update user record with new password and delete the password-reset token and expiration
+                _db.collection(dbColl_Users).updateOne(
+                  { email: user.email },
+                  {
+                    $set: {
+                      password: hashedPassword,
+                      resetPasswordToken: "",
+                      resetPasswordExpires: ""
+                    }
+                  },
+                  function(err) {
+                    console.log("2nd function done");
+                    done(err, user);
+                  }
+                );
+              }
+            );
+          },
+          function(user, done) {
+            // Define smtp transport with gmail account used for sending password-reset confirmations
+            var smtpTransport = nodemailer.createTransport({
+              host: "smtp.gmail.com",
+              port: 587,
+              secure: false,
+              auth: {
+                user: "labinventorypwreset@gmail.com",
+                pass: "raid4us!"
+              }
+            });
+            console.log("smtpTransport done");
+
+            // Define the content of the email being sent
+            var mailOptions = {
+              to: user.email,
+              from: "labinventorypwreset@gmail.com",
+              subject: "Your password has been changed",
+              text:
+                "Hello,\n\n" +
+                "This is a confirmation that the password for your account " +
+                user.email +
+                " has just been changed.\n"
+            };
+            console.log("mailOptions done");
+
+            // Send the email
+            smtpTransport.sendMail(mailOptions, function(err) {
+              if (err) return console.log(err);
+              console.log("Password has been changed!");
+              done(err, "done");
+            });
+            console.log("sendMail done");
+          }
+        ],
+        function(err) {
+          // Check for errors thrown by waterfall
+          if (err) return console.log(err);
+
+          // Send response to front-end to confirm the email was sent
+          res.json({ message: "password changed" });
         }
       );
     });
