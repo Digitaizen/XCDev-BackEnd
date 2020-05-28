@@ -130,6 +130,9 @@ async function getRedfishData(idracIps, db) {
       .then(systemData => {
         // Store data from systems URL in iDRAC data object
         redfishDataObject["System"] = systemData;
+        let systemGeneration = redfishDataObject.System.hasOwnProperty("Oem")
+          ? redfishDataObject.System.Oem.Dell.DellSystem.SystemGeneration
+          : "";
 
         // Add or update collection entry with iDRAC data object
         return db
@@ -147,7 +150,8 @@ async function getRedfishData(idracIps, db) {
                     ip: item,
                     serviceTag: redfishDataObject.System.SKU,
                     model: redfishDataObject.System.Model,
-                    hostname: redfishDataObject.System.HostName
+                    hostname: redfishDataObject.System.HostName,
+                    generation: systemGeneration
                   }
                 },
                 err => {
@@ -171,7 +175,11 @@ async function getRedfishData(idracIps, db) {
                       serviceTag: redfishDataObject.System.SKU,
                       model: redfishDataObject.System.Model,
                       hostname: redfishDataObject.System.HostName,
-                      status: "CheckOut"
+                      generation: systemGeneration,
+                      status: "CheckOut",
+                      user: "",
+                      timestamp: "",
+                      comments: ""
                     },
                     { checkKeys: false },
                     (err, res) => {
@@ -388,7 +396,8 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
               (err, token) => {
                 res.json({
                   success: true,
-                  token: "Bearer " + token
+                  token: "Bearer " + token,
+                  userInfo: user
                 });
               }
             );
@@ -482,6 +491,24 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
         {
           $set: {
             status: req.body.status
+          }
+        },
+        (err, results) => {
+          if (err) {
+            res.status(500).send(err);
+          } else {
+            res.status(200).send(results);
+          }
+        }
+      );
+    });
+
+    app.patch("/patchComments/:id", (req, res) => {
+      _db.collection(dbColl_Servers).updateOne(
+        { _id: parseInt(req.params.id) },
+        {
+          $set: {
+            comments: req.body.comments
           }
         },
         (err, results) => {
