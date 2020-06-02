@@ -133,7 +133,6 @@ async function getRedfishData(idracIps, db) {
       .then(systemData => {
         // Store data from systems URL in iDRAC data object
         redfishDataObject["System"] = systemData;
-        // Define iDRAC generation if present in Systems URI
         let systemGeneration = redfishDataObject.System.hasOwnProperty("Oem")
           ? redfishDataObject.System.Oem.Dell.DellSystem.SystemGeneration
           : "";
@@ -480,26 +479,22 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
     app.get("/status/:id", (req, res) => {
       _db
         .collection(dbColl_Servers)
-        .findOne(
-          { _id: parseInt(req.params.id) },
-          { projection: { status: 1, _id: 0 } },
-          (err, results) => {
-            if (err) {
-              res.status(500).send(err);
-            } else {
-              res.json(results);
-            }
+        .findOne({ _id: parseInt(req.params.id) }, (err, results) => {
+          if (err) {
+            res.status(500).send(err);
+          } else {
+            res.json(results);
           }
-        );
+        });
     });
 
-    // Patch status value of server that has specified id
     app.patch("/patchStatus/:id", (req, res) => {
       _db.collection(dbColl_Servers).updateOne(
         { _id: parseInt(req.params.id) },
         {
           $set: {
-            status: req.body.status
+            status: req.body.status,
+            user: req.body.user
           }
         },
         (err, results) => {
