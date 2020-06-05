@@ -180,7 +180,6 @@ async function getRedfishData(idracIps, db) {
                       hostname: redfishDataObject.System.HostName,
                       generation: systemGeneration,
                       status: "CheckOut",
-                      user: "",
                       timestamp: "",
                       comments: ""
                     },
@@ -492,7 +491,7 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
         {
           $set: {
             status: req.body.status,
-            user: req.body.user
+            timestamp: req.body.timestamp
           }
         },
         (err, results) => {
