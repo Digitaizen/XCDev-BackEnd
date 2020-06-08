@@ -10,7 +10,6 @@ const https = require("https");
 const fetch = require("node-fetch");
 const fs = require("fs");
 const express = require("express");
-const bcrypt = require("bcrypt");
 const passport = require("passport");
 const jwt = require("jsonwebtoken");
 const bodyParser = require("body-parser");
@@ -179,7 +178,7 @@ async function getRedfishData(idracIps, db) {
                       model: redfishDataObject.System.Model,
                       hostname: redfishDataObject.System.HostName,
                       generation: systemGeneration,
-                      status: "CheckOut",
+                      status: "available",
                       timestamp: "",
                       comments: ""
                     },
@@ -380,36 +379,35 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
           }
 
           // Check password
-          bcrypt.compare(req.body.password, user.password).then(isMatch => {
-            if (isMatch) {
-              // User matched
-              // Create JWT Payload
-              const payload = {
-                id: user.id,
-                name: user.name
-              };
 
-              // Sign token
-              jwt.sign(
-                payload,
-                keys.secretOrKey,
-                {
-                  expiresIn: 31556926 // 1 year in seconds
-                },
-                (err, token) => {
-                  res.json({
-                    success: true,
-                    token: "Bearer " + token,
-                    userInfo: user
-                  });
-                }
-              );
-            } else {
-              return res
-                .status(400)
-                .json({ passwordincorrect: "Password incorrect" });
-            }
-          });
+          if (req.body.password == user.password) {
+            // User matched
+            // Create JWT Payload
+            const payload = {
+              id: user.id,
+              name: user.name
+            };
+
+            // Sign token
+            jwt.sign(
+              payload,
+              keys.secretOrKey,
+              {
+                expiresIn: 31556926 // 1 year in seconds
+              },
+              (err, token) => {
+                res.json({
+                  success: true,
+                  token: "Bearer " + token,
+                  userInfo: user
+                });
+              }
+            );
+          } else {
+            return res
+              .status(400)
+              .json({ passwordincorrect: "Password incorrect" });
+          }
         });
     });
 
@@ -422,9 +420,6 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
       if (!isValid) {
         return res.status(400).json(errors);
       }
-
-      // Create hashed password
-      const hashedPassword = await bcrypt.hash(req.body.password, 10);
 
       try {
         // Check if email is already in use; if not, create new user record in collection
@@ -442,7 +437,7 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
                     name: req.body.name,
                     email: req.body.email,
                     username: req.body.username,
-                    password: hashedPassword
+                    password: req.body.password
                   },
                   { checkKeys: false }
                 )
@@ -525,9 +520,6 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
 
     // Reset password of user with specified password-reset token
     app.post("/reset", async (req, res) => {
-      // Create hashed password
-      const hashedPassword = await bcrypt.hash(req.body.password, 10);
-
       _db
         .collection(dbColl_Users)
         .findOne({ username: req.body.username })
@@ -556,7 +548,7 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
             { username: req.body.username },
             {
               $set: {
-                password: hashedPassword
+                password: req.body.password
               }
             },
             function(err, results) {
