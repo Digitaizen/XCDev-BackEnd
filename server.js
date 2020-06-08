@@ -10,7 +10,6 @@ const https = require("https");
 const fetch = require("node-fetch");
 const fs = require("fs");
 const express = require("express");
-const bcrypt = require("bcrypt");
 const passport = require("passport");
 const jwt = require("jsonwebtoken");
 const bodyParser = require("body-parser");
@@ -19,9 +18,12 @@ const ExtractJwt = require("passport-jwt").ExtractJwt;
 const keys = require("./config/keys");
 const Validator = require("validator");
 const isEmpty = require("is-empty");
+const async = require("async");
+const nodemailer = require("nodemailer");
+const crypto = require("crypto");
 
 // Declare the globals ////////////////////////////////////////////////////////
-const dbUrl = "mongodb://mongoserv:raid4us!@localhost:27017";
+const dbUrl = "mongodb://localhost:27017";
 const dbName = "dev";
 const dbColl_Servers = "servers";
 const dbColl_Users = "users";
@@ -130,6 +132,9 @@ async function getRedfishData(idracIps, db) {
       .then(systemData => {
         // Store data from systems URL in iDRAC data object
         redfishDataObject["System"] = systemData;
+        let systemGeneration = redfishDataObject.System.hasOwnProperty("Oem")
+          ? redfishDataObject.System.Oem.Dell.DellSystem.SystemGeneration
+          : "";
 
         // Add or update collection entry with iDRAC data object
         return db
@@ -147,7 +152,8 @@ async function getRedfishData(idracIps, db) {
                     ip: item,
                     serviceTag: redfishDataObject.System.SKU,
                     model: redfishDataObject.System.Model,
-                    hostname: redfishDataObject.System.HostName
+                    hostname: redfishDataObject.System.HostName,
+                    generation: systemGeneration
                   }
                 },
                 err => {
@@ -171,7 +177,10 @@ async function getRedfishData(idracIps, db) {
                       serviceTag: redfishDataObject.System.SKU,
                       model: redfishDataObject.System.Model,
                       hostname: redfishDataObject.System.HostName,
-                      status: "CheckOut"
+                      generation: systemGeneration,
+                      status: "available",
+                      timestamp: "",
+                      comments: ""
                     },
                     { checkKeys: false },
                     (err, res) => {
@@ -370,7 +379,8 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
           }
 
           // Check password
-          if (user.password == req.body.password) {
+
+          if (req.body.password == user.password) {
             // User matched
             // Create JWT Payload
             const payload = {
@@ -388,7 +398,8 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
               (err, token) => {
                 res.json({
                   success: true,
-                  token: "Bearer " + token
+                  token: "Bearer " + token,
+                  userInfo: user
                 });
               }
             );
@@ -409,9 +420,6 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
       if (!isValid) {
         return res.status(400).json(errors);
       }
-
-      // Create hashed password
-      // const hashedPassword = await bcrypt.hash(req.body.password, 10);
 
       try {
         // Check if email is already in use; if not, create new user record in collection
@@ -463,17 +471,13 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
     app.get("/status/:id", (req, res) => {
       _db
         .collection(dbColl_Servers)
-        .findOne(
-          { _id: parseInt(req.params.id) },
-          { projection: { status: 1, _id: 0 } },
-          (err, results) => {
-            if (err) {
-              res.status(500).send(err);
-            } else {
-              res.json(results);
-            }
+        .findOne({ _id: parseInt(req.params.id) }, (err, results) => {
+          if (err) {
+            res.status(500).send(err);
+          } else {
+            res.json(results);
           }
-        );
+        });
     });
 
     app.patch("/patchStatus/:id", (req, res) => {
@@ -481,7 +485,8 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
         { _id: parseInt(req.params.id) },
         {
           $set: {
-            status: req.body.status
+            status: req.body.status,
+            timestamp: req.body.timestamp
           }
         },
         (err, results) => {
@@ -492,6 +497,69 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
           }
         }
       );
+    });
+
+    // Patch comments value of server that has specified id
+    app.patch("/patchComments/:id", (req, res) => {
+      _db.collection(dbColl_Servers).updateOne(
+        { _id: parseInt(req.params.id) },
+        {
+          $set: {
+            comments: req.body.comments
+          }
+        },
+        (err, results) => {
+          if (err) {
+            res.status(500).send(err);
+          } else {
+            res.status(200).send(results);
+          }
+        }
+      );
+    });
+
+    // Reset password of user with specified password-reset token
+    app.post("/reset", async (req, res) => {
+      _db
+        .collection(dbColl_Users)
+        .findOne({ username: req.body.username })
+        .then(user => {
+          // Check if user exists
+          if (!user) {
+            return res
+              .status(404)
+              .json({ emailnotfound: "Username not found" });
+          }
+
+          // Check if password is long enough
+          if (!Validator.isLength(req.body.password, { min: 6, max: 30 })) {
+            return res
+              .status(404)
+              .json({ password: "Password must be at least 6 characters" });
+          }
+
+          // Check if passwords match
+          if (!Validator.equals(req.body.password, req.body.password2)) {
+            return res.status(404).json({ password2: "Passwords must match" });
+          }
+
+          // Update user record with new password
+          _db.collection(dbColl_Users).updateOne(
+            { username: req.body.username },
+            {
+              $set: {
+                password: req.body.password
+              }
+            },
+            function(err, results) {
+              if (err) {
+                res.status(500).send(err);
+              } else {
+                res.status(200).send(results);
+              }
+            }
+          );
+        });
     });
   }
 );
