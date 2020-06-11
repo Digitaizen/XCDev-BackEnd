@@ -21,6 +21,7 @@ const isEmpty = require("is-empty");
 const async = require("async");
 const nodemailer = require("nodemailer");
 const crypto = require("crypto");
+const cors = require("cors");
 
 // Declare the globals ////////////////////////////////////////////////////////
 const dbUrl = "mongodb://localhost:27017";
@@ -303,6 +304,7 @@ console.log("Launching the backend server..");
 
 // Instantiate
 const app = express();
+app.use(cors());
 
 // Connect to the database, start the server, query iDRACs via RedFish, and populate db
 MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
