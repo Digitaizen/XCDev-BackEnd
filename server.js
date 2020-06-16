@@ -33,6 +33,9 @@ const portNum = 8080;
 const ipFile = "./active_iDRAC_ips.txt";
 const iDracLogin = "root";
 const iDracPassword = "calvin";
+const corsOptions = {
+  origin: ["http://100.80.149.19", "http://100.80.150.91"]
+};
 
 // Define functions here //////////////////////////////////////////////////////
 // Grab iDRAC IPs from a text file
@@ -295,7 +298,7 @@ console.log("Launching the backend server..");
 
 // Instantiate
 const app = express();
-app.use(cors());
+app.use(cors(corsOptions));
 
 // Connect to the database, start the server, query iDRACs via RedFish, and populate db
 MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
