@@ -421,7 +421,11 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
         // Check if email is already in use; if not, create new user record in collection
         _db
           .collection(dbColl_Users)
-          .findOne({ email: req.body.email })
+          .findOne({
+            email: {
+              $regex: new RegExp("^" + req.body.email.toLowerCase() + "$", "i")
+            }
+          })
           .then(user => {
             if (user) {
               return res.status(400).json({ message: "Email already exists" });
