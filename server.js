@@ -365,7 +365,11 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
       // If user exists and password is correct, return a success token
       _db
         .collection(dbColl_Users)
-        .findOne({ username: req.body.username })
+        .findOne({
+          username: {
+            $regex: new RegExp("^" + req.body.username.toLowerCase() + "$", "i")
+          }
+        })
         .then(user => {
           // Check if user exists
           if (!user) {
