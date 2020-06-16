@@ -34,7 +34,11 @@ const ipFile = "./active_iDRAC_ips.txt";
 const iDracLogin = "root";
 const iDracPassword = "calvin";
 const corsOptions = {
-  origin: ["http://100.80.149.19", "http://100.80.150.91"]
+  origin: [
+    "http://localhost:3000",
+    "http://100.80.149.19",
+    "http://100.80.150.91"
+  ]
 };
 
 // Define functions here //////////////////////////////////////////////////////
@@ -359,7 +363,7 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
 
       // Check validation
       if (!isValid) {
-        return res.status(400).json(errors);
+        return res.status(400).json(Object.assign({ success: false }, errors));
       }
 
       // If user exists and password is correct, return a success token
@@ -373,7 +377,10 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
         .then(user => {
           // Check if user exists
           if (!user) {
-            return res.status(404).json({ message: "Username not found" });
+            return res.status(404).json({
+              success: false,
+              message: "Username not found"
+            });
           }
 
           // Check password
@@ -396,13 +403,16 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
               (err, token) => {
                 res.json({
                   success: true,
+                  message: "Login is successful",
                   token: "Bearer " + token,
                   userInfo: user
                 });
               }
             );
           } else {
-            return res.status(400).json({ message: "Password incorrect" });
+            return res
+              .status(400)
+              .json({ success: false, message: "Password incorrect" });
           }
         });
     });
@@ -414,7 +424,7 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
 
       // Check validation
       if (!isValid) {
-        return res.status(400).json(errors);
+        return res.status(400).json(Object.assign({ success: false }, errors));
       }
 
       try {
@@ -428,7 +438,9 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
           })
           .then(user => {
             if (user) {
-              return res.status(400).json({ message: "Email already exists" });
+              return res
+                .status(400)
+                .json({ success: false, message: "Email already exists" });
             } else {
               _db
                 .collection(dbColl_Users)
@@ -441,7 +453,14 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
                   },
                   { checkKeys: false }
                 )
-                .then(user => res.json(user.ops[0]))
+                .then(user =>
+                  res.json(
+                    Object.assign(
+                      { success: true, message: "Registration is successful" },
+                      user.ops[0]
+                    )
+                  )
+                )
                 .catch(err => console.log(err));
               console.log("You're registered! Now login");
             }
@@ -473,9 +492,17 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
         .collection(dbColl_Servers)
         .findOne({ _id: parseInt(req.params.id) }, (err, results) => {
           if (err) {
-            res.status(500).send(err);
+            res.status(500).json(Object.assign({ success: false }, err));
           } else {
-            res.json(results);
+            res.json(
+              Object.assign(
+                {
+                  success: true,
+                  message: "Document with specified _id successfully retrieved"
+                },
+                results
+              )
+            );
           }
         });
     });
@@ -491,9 +518,16 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
         },
         (err, results) => {
           if (err) {
-            res.status(500).send(err);
+            res.status(500).json(Object.assign({ success: false }, err));
           } else {
-            res.status(200).send(results);
+            res
+              .status(200)
+              .json(
+                Object.assign(
+                  { success: true, message: "Status successfully patched" },
+                  results
+                )
+              );
           }
         }
       );
@@ -510,9 +544,16 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
         },
         (err, results) => {
           if (err) {
-            res.status(500).send(err);
+            res.status(500).json(Object.assign({ success: false }, err));
           } else {
-            res.status(200).send(results);
+            res
+              .status(200)
+              .json(
+                Object.assign(
+                  { success: true, message: "Comment successfully patched" },
+                  results
+                )
+              );
           }
         }
       );
@@ -526,19 +567,24 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
         .then(user => {
           // Check if user exists
           if (!user) {
-            return res.status(404).json({ message: "Username not found" });
+            return res
+              .status(404)
+              .json({ success: false, message: "Username not found" });
           }
 
           // Check if password is long enough
           if (!Validator.isLength(req.body.password, { min: 6, max: 30 })) {
-            return res
-              .status(404)
-              .json({ message: "Password must be at least 6 characters" });
+            return res.status(404).json({
+              success: false,
+              message: "Password must be at least 6 characters"
+            });
           }
 
           // Check if passwords match
           if (!Validator.equals(req.body.password, req.body.password2)) {
-            return res.status(404).json({ message: "Passwords must match" });
+            return res
+              .status(404)
+              .json({ success: false, message: "Passwords must match" });
           }
 
           // Update user record with new password
@@ -551,9 +597,17 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
             },
             function(err, results) {
               if (err) {
-                res.status(500).send(err);
+                res.status(500).json(Object.assign({ success: false }, err));
               } else {
-                res.status(200).send(results);
+                res.status(200).json(
+                  Object.assign(
+                    {
+                      success: true,
+                      message: "Password successfully reset"
+                    },
+                    results
+                  )
+                );
               }
             }
           );
