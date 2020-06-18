@@ -22,6 +22,7 @@ const async = require("async");
 const nodemailer = require("nodemailer");
 const crypto = require("crypto");
 const cors = require("cors");
+const morganBody = require("morgan-body");
 
 // Declare the globals ////////////////////////////////////////////////////////
 const dbUrl = "mongodb://localhost:27017";
@@ -351,6 +352,12 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
     );
 
     app.use(bodyParser.json());
+
+    // Log API responses to access.log
+    var accessLogStream = fs.createWriteStream(__dirname + "/access.log", {
+      flags: "a"
+    });
+    morganBody(app, { stream: accessLogStream, noColors: true });
 
     // Accept valid login credentials and return a JSON web token
     app.post("/login", (req, res) => {
