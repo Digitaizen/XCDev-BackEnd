@@ -35,7 +35,11 @@ const ipFile = "./active_iDRAC_ips.txt";
 const iDracLogin = "root";
 const iDracPassword = "calvin";
 const corsOptions = {
-  origin: ["http://100.80.149.19", "http://100.80.150.91"]
+  origin: [
+    "http://localhost:3000",
+    "http://100.80.149.19",
+    "http://100.80.150.91"
+  ]
 };
 
 // Define functions here //////////////////////////////////////////////////////
