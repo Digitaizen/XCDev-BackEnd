@@ -27,9 +27,8 @@ const morganBody = require("morgan-body");
 // Declare the globals ////////////////////////////////////////////////////////
 const dbUrl = "mongodb://localhost:27017";
 const dbName = "dev";
-const dbColl_Servers = "servers";
+const dbColl_Servers = "testServers";
 const dbColl_Users = "users";
-const dbColl_Counters = "counters";
 const portNum = 8080;
 const ipFile = "./active_iDRAC_ips.txt";
 const iDracLogin = "root";
@@ -51,23 +50,6 @@ function readIpFile(fName) {
     .replace(/\r/g, "")
     .split("\n");
   return idracIps;
-}
-
-/**
- * Increases counter variable by 1
- *
- * @return {Number} counter value used as _id in latest servers collection entry
- */
-function getNextSequence(db, name, callback) {
-  db.collection(dbColl_Counters).findAndModify(
-    { _id: name },
-    null,
-    { $inc: { seq: 1 } },
-    function(err, result) {
-      if (err) callback(err, result);
-      callback(err, result.value.seq);
-    }
-  );
 }
 
 /**
@@ -202,33 +184,30 @@ async function getRedfishData(idracIps, db) {
               );
               // If no entry with the same iDRAC IP is found, add a new entry
             } else {
-              getNextSequence(db, "serverId", function(err, result) {
-                if (!err) {
-                  db.collection(dbColl_Servers).insertOne(
-                    {
-                      _id: result,
-                      ip: item,
-                      serviceTag: redfishDataObject.System.SKU,
-                      model: redfishDataObject.System.Model,
-                      hostname: redfishDataObject.System.HostName,
-                      generation: systemGeneration,
-                      location: serverLocation,
-                      status: "available",
-                      timestamp: "",
-                      comments: ""
-                    },
-                    { checkKeys: false },
-                    (err, res) => {
-                      if (err) {
-                        return console.log(err);
-                      }
-                      serverCount++;
-                      console.log("Server added to db");
-                      console.log("Server #", serverCount);
+              if (!err) {
+                db.collection(dbColl_Servers).insertOne(
+                  {
+                    ip: item,
+                    serviceTag: redfishDataObject.System.SKU,
+                    model: redfishDataObject.System.Model,
+                    hostname: redfishDataObject.System.HostName,
+                    generation: systemGeneration,
+                    location: serverLocation,
+                    status: "available",
+                    timestamp: "",
+                    comments: ""
+                  },
+                  { checkKeys: false },
+                  (err, res) => {
+                    if (err) {
+                      return console.log(err);
                     }
-                  );
-                }
-              });
+                    serverCount++;
+                    console.log("Server added to db");
+                    console.log("Server #", serverCount);
+                  }
+                );
+              }
             }
           });
       })
