@@ -98,6 +98,10 @@ async function getRedfishData(idracIps, db) {
     // Define the URLs to be fetched from
     let v1Url = "https://" + item + "/redfish/v1";
     let systemUrl = "https://" + item + "/redfish/v1/Systems/System.Embedded.1";
+    let locationUrl =
+      "https://" +
+      item +
+      "/redfish/v1/Managers/System.Embedded.1/Attributes?$select=ServerTopology.*";
 
     // Construct options to be used in fetch call
     const agent = new https.Agent({
@@ -141,8 +145,28 @@ async function getRedfishData(idracIps, db) {
       .then(systemData => {
         // Store data from systems URL in iDRAC data object
         redfishDataObject["System"] = systemData;
+
+        return fetch_retry(locationUrl, options, 3);
+      })
+      .then(response => {
+        if (response.ok) {
+          return response.json();
+        } else {
+          return { error: "No location data available" };
+        }
+      })
+      .then(locationData => {
+        // Store data from location URL in iDRAC data object
+        redfishDataObject["Location"] = locationData;
+
         let systemGeneration = redfishDataObject.System.hasOwnProperty("Oem")
           ? redfishDataObject.System.Oem.Dell.DellSystem.SystemGeneration
+          : "";
+
+        let serverLocation = redfishDataObject.Location.hasOwnProperty(
+          "Attributes"
+        )
+          ? `${redfishDataObject.Location.Attributes["ServerTopology.1.DataCenterName"]} ${redfishDataObject.Location.Attributes["ServerTopology.1.RackName"]} ${redfishDataObject.Location.Attributes["ServerTopology.1.RackSlot"]}`
           : "";
 
         // Add or update collection entry with iDRAC data object
@@ -162,7 +186,8 @@ async function getRedfishData(idracIps, db) {
                     serviceTag: redfishDataObject.System.SKU,
                     model: redfishDataObject.System.Model,
                     hostname: redfishDataObject.System.HostName,
-                    generation: systemGeneration
+                    generation: systemGeneration,
+                    location: serverLocation
                   }
                 },
                 err => {
@@ -187,6 +212,7 @@ async function getRedfishData(idracIps, db) {
                       model: redfishDataObject.System.Model,
                       hostname: redfishDataObject.System.HostName,
                       generation: systemGeneration,
+                      location: serverLocation,
                       status: "available",
                       timestamp: "",
                       comments: ""
