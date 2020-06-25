@@ -27,7 +27,7 @@ const morganBody = require("morgan-body");
 // Declare the globals ////////////////////////////////////////////////////////
 const dbUrl = "mongodb://localhost:27017";
 const dbName = "dev";
-const dbColl_Servers = "testServers";
+const dbColl_Servers = "servers";
 const dbColl_Users = "users";
 const portNum = 8080;
 const ipFile = "./active_iDRAC_ips.txt";
