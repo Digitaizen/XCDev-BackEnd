@@ -148,7 +148,7 @@ async function getRedfishData(idracIps, db) {
         let serverLocation = redfishDataObject.Location.hasOwnProperty(
           "Attributes"
         )
-          ? `${redfishDataObject.Location.Attributes["ServerTopology.1.DataCenterName"]} ${redfishDataObject.Location.Attributes["ServerTopology.1.RackName"]} ${redfishDataObject.Location.Attributes["ServerTopology.1.RackSlot"]}`
+          ? `${redfishDataObject.Location.Attributes["ServerTopology.1.DataCenterName"]}-${redfishDataObject.Location.Attributes["ServerTopology.1.RackName"]}-${redfishDataObject.Location.Attributes["ServerTopology.1.RackSlot"]}`
           : "";
 
         // Add or update collection entry with iDRAC data object
