@@ -5,6 +5,7 @@
 
 // Pull-in required modules ///////////////////////////////////////////////////
 const MongoClient = require("mongodb").MongoClient;
+const mongoose = require("mongoose");
 const base64 = require("base-64");
 const https = require("https");
 const fetch = require("node-fetch");
@@ -502,26 +503,30 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
     app.get("/status/:id", (req, res) => {
       _db
         .collection(dbColl_Servers)
-        .findOne({ _id: parseInt(req.params.id) }, (err, results) => {
-          if (err) {
-            res.status(500).json(Object.assign({ success: false }, err));
-          } else {
-            res.json(
-              Object.assign(
-                {
-                  success: true,
-                  message: "Document with specified _id successfully retrieved"
-                },
-                results
-              )
-            );
+        .findOne(
+          { _id: mongoose.Types.ObjectId(req.params.id) },
+          (err, results) => {
+            if (err) {
+              res.status(500).json(Object.assign({ success: false }, err));
+            } else {
+              res.json(
+                Object.assign(
+                  {
+                    success: true,
+                    message:
+                      "Document with specified _id successfully retrieved"
+                  },
+                  results
+                )
+              );
+            }
           }
-        });
+        );
     });
 
     app.patch("/patchStatus/:id", (req, res) => {
       _db.collection(dbColl_Servers).updateOne(
-        { _id: parseInt(req.params.id) },
+        { _id: mongoose.Types.ObjectId(req.params.id) },
         {
           $set: {
             status: req.body.status,
@@ -548,7 +553,7 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
     // Patch comments value of server that has specified id
     app.patch("/patchComments/:id", (req, res) => {
       _db.collection(dbColl_Servers).updateOne(
-        { _id: parseInt(req.params.id) },
+        { _id: mongoose.Types.ObjectId(req.params.id) },
         {
           $set: {
             comments: req.body.comments
