@@ -5,6 +5,7 @@
 
 // Pull-in required modules ///////////////////////////////////////////////////
 const MongoClient = require("mongodb").MongoClient;
+const mongoose = require("mongoose");
 const base64 = require("base-64");
 const https = require("https");
 const fetch = require("node-fetch");
@@ -29,7 +30,6 @@ const dbUrl = "mongodb://localhost:27017";
 const dbName = "dev";
 const dbColl_Servers = "servers";
 const dbColl_Users = "users";
-const dbColl_Counters = "counters";
 const portNum = 8080;
 const ipFile = "./active_iDRAC_ips.txt";
 const iDracLogin = "root";
@@ -51,23 +51,6 @@ function readIpFile(fName) {
     .replace(/\r/g, "")
     .split("\n");
   return idracIps;
-}
-
-/**
- * Increases counter variable by 1
- *
- * @return {Number} counter value used as _id in latest servers collection entry
- */
-function getNextSequence(db, name, callback) {
-  db.collection(dbColl_Counters).findAndModify(
-    { _id: name },
-    null,
-    { $inc: { seq: 1 } },
-    function(err, result) {
-      if (err) callback(err, result);
-      callback(err, result.value.seq);
-    }
-  );
 }
 
 /**
@@ -98,6 +81,10 @@ async function getRedfishData(idracIps, db) {
     // Define the URLs to be fetched from
     let v1Url = "https://" + item + "/redfish/v1";
     let systemUrl = "https://" + item + "/redfish/v1/Systems/System.Embedded.1";
+    let locationUrl =
+      "https://" +
+      item +
+      "/redfish/v1/Managers/System.Embedded.1/Attributes?$select=ServerTopology.*";
 
     // Construct options to be used in fetch call
     const agent = new https.Agent({
@@ -141,8 +128,28 @@ async function getRedfishData(idracIps, db) {
       .then(systemData => {
         // Store data from systems URL in iDRAC data object
         redfishDataObject["System"] = systemData;
+
+        return fetch_retry(locationUrl, options, 3);
+      })
+      .then(response => {
+        if (response.ok) {
+          return response.json();
+        } else {
+          return { error: "No location data available" };
+        }
+      })
+      .then(locationData => {
+        // Store data from location URL in iDRAC data object
+        redfishDataObject["Location"] = locationData;
+
         let systemGeneration = redfishDataObject.System.hasOwnProperty("Oem")
           ? redfishDataObject.System.Oem.Dell.DellSystem.SystemGeneration
+          : "";
+
+        let serverLocation = redfishDataObject.Location.hasOwnProperty(
+          "Attributes"
+        )
+          ? `${redfishDataObject.Location.Attributes["ServerTopology.1.DataCenterName"]}-${redfishDataObject.Location.Attributes["ServerTopology.1.RackName"]}-${redfishDataObject.Location.Attributes["ServerTopology.1.RackSlot"]}`
           : "";
 
         // Add or update collection entry with iDRAC data object
@@ -162,7 +169,8 @@ async function getRedfishData(idracIps, db) {
                     serviceTag: redfishDataObject.System.SKU,
                     model: redfishDataObject.System.Model,
                     hostname: redfishDataObject.System.HostName,
-                    generation: systemGeneration
+                    generation: systemGeneration,
+                    location: serverLocation
                   }
                 },
                 err => {
@@ -177,32 +185,30 @@ async function getRedfishData(idracIps, db) {
               );
               // If no entry with the same iDRAC IP is found, add a new entry
             } else {
-              getNextSequence(db, "serverId", function(err, result) {
-                if (!err) {
-                  db.collection(dbColl_Servers).insertOne(
-                    {
-                      _id: result,
-                      ip: item,
-                      serviceTag: redfishDataObject.System.SKU,
-                      model: redfishDataObject.System.Model,
-                      hostname: redfishDataObject.System.HostName,
-                      generation: systemGeneration,
-                      status: "available",
-                      timestamp: "",
-                      comments: ""
-                    },
-                    { checkKeys: false },
-                    (err, res) => {
-                      if (err) {
-                        return console.log(err);
-                      }
-                      serverCount++;
-                      console.log("Server added to db");
-                      console.log("Server #", serverCount);
+              if (!err) {
+                db.collection(dbColl_Servers).insertOne(
+                  {
+                    ip: item,
+                    serviceTag: redfishDataObject.System.SKU,
+                    model: redfishDataObject.System.Model,
+                    hostname: redfishDataObject.System.HostName,
+                    generation: systemGeneration,
+                    location: serverLocation,
+                    status: "available",
+                    timestamp: "",
+                    comments: ""
+                  },
+                  { checkKeys: false },
+                  (err, res) => {
+                    if (err) {
+                      return console.log(err);
                     }
-                  );
-                }
-              });
+                    serverCount++;
+                    console.log("Server added to db");
+                    console.log("Server #", serverCount);
+                  }
+                );
+              }
             }
           });
       })
@@ -497,26 +503,30 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
     app.get("/status/:id", (req, res) => {
       _db
         .collection(dbColl_Servers)
-        .findOne({ _id: parseInt(req.params.id) }, (err, results) => {
-          if (err) {
-            res.status(500).json(Object.assign({ success: false }, err));
-          } else {
-            res.json(
-              Object.assign(
-                {
-                  success: true,
-                  message: "Document with specified _id successfully retrieved"
-                },
-                results
-              )
-            );
+        .findOne(
+          { _id: mongoose.Types.ObjectId(req.params.id) },
+          (err, results) => {
+            if (err) {
+              res.status(500).json(Object.assign({ success: false }, err));
+            } else {
+              res.json(
+                Object.assign(
+                  {
+                    success: true,
+                    message:
+                      "Document with specified _id successfully retrieved"
+                  },
+                  results
+                )
+              );
+            }
           }
-        });
+        );
     });
 
     app.patch("/patchStatus/:id", (req, res) => {
       _db.collection(dbColl_Servers).updateOne(
-        { _id: parseInt(req.params.id) },
+        { _id: mongoose.Types.ObjectId(req.params.id) },
         {
           $set: {
             status: req.body.status,
@@ -543,7 +553,7 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
     // Patch comments value of server that has specified id
     app.patch("/patchComments/:id", (req, res) => {
       _db.collection(dbColl_Servers).updateOne(
-        { _id: parseInt(req.params.id) },
+        { _id: mongoose.Types.ObjectId(req.params.id) },
         {
           $set: {
             comments: req.body.comments
