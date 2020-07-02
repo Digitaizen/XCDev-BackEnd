@@ -85,6 +85,10 @@ async function getRedfishData(idracIps, db) {
       "https://" +
       item +
       "/redfish/v1/Managers/System.Embedded.1/Attributes?$select=ServerTopology.*";
+    let codeNameUrl =
+      "https://" +
+      item +
+      "/redfish/v1/Managers/iDRAC.Embedded.1/Attributes?$select=CurrentNIC.*";
 
     // Construct options to be used in fetch call
     const agent = new https.Agent({
@@ -141,6 +145,19 @@ async function getRedfishData(idracIps, db) {
       .then(locationData => {
         // Store data from location URL in iDRAC data object
         redfishDataObject["Location"] = locationData;
+
+        return fetch_retry(codeNameUrl, options, 3);
+      })
+      .then(response => {
+        if (response.ok) {
+          return response.json();
+        } else {
+          return { error: "No location data available" };
+        }
+      })
+      .then(codeNameData => {
+        // Store data from codename URL in iDRAC data object
+        redfishDataObject["codeName"] = codeNameData;
 
         let systemGeneration = redfishDataObject.System.hasOwnProperty("Oem")
           ? redfishDataObject.System.Oem.Dell.DellSystem.SystemGeneration
