@@ -172,62 +172,65 @@ async function getRedfishData(idracIps, db) {
         // Add or update collection entry with iDRAC data object
         return db
           .collection(dbColl_Servers)
-          .findOne({ ip: item }, (err, results) => {
-            if (err) {
-              return console.log(err);
-            }
-            // If an entry with the same iDRAC IP is found, update the entry
-            if (results !== null) {
-              db.collection(dbColl_Servers).updateOne(
-                { ip: item },
-                {
-                  $set: {
-                    ip: item,
-                    serviceTag: redfishDataObject.System.SKU,
-                    model: redfishDataObject.System.Model,
-                    hostname: redfishDataObject.System.HostName,
-                    generation: systemGeneration,
-                    location: serverLocation
-                  }
-                },
-                err => {
-                  if (err) {
-                    return console.log(err);
-                  }
-                  serverCount++;
-                  console.log(
-                    `Server # ${serverCount} @ ${item} updated in db`
-                  );
-                }
-              );
-              // If no entry with the same iDRAC IP is found, add a new entry
-            } else {
-              if (!err) {
-                db.collection(dbColl_Servers).insertOne(
+          .findOne(
+            { serviceTag: redfishDataObject.System.SKU },
+            (err, results) => {
+              if (err) {
+                return console.log(err);
+              }
+              // If an entry with the same service tag is found, update the entry
+              if (results !== null) {
+                db.collection(dbColl_Servers).updateOne(
+                  { serviceTag: redfishDataObject.System.SKU },
                   {
-                    ip: item,
-                    serviceTag: redfishDataObject.System.SKU,
-                    model: redfishDataObject.System.Model,
-                    hostname: redfishDataObject.System.HostName,
-                    generation: systemGeneration,
-                    location: serverLocation,
-                    status: "available",
-                    timestamp: "",
-                    comments: ""
+                    $set: {
+                      ip: item,
+                      serviceTag: redfishDataObject.System.SKU,
+                      model: redfishDataObject.System.Model,
+                      hostname: redfishDataObject.System.HostName,
+                      generation: systemGeneration
+                      // location: serverLocation
+                    }
                   },
-                  { checkKeys: false },
-                  (err, res) => {
+                  err => {
                     if (err) {
                       return console.log(err);
                     }
                     serverCount++;
-                    console.log("Server added to db");
-                    console.log("Server #", serverCount);
+                    console.log(
+                      `Server # ${serverCount} @ ${item} updated in db`
+                    );
                   }
                 );
+                // If no entry with the same service tag is found, add a new entry
+              } else {
+                if (!err) {
+                  db.collection(dbColl_Servers).insertOne(
+                    {
+                      ip: item,
+                      serviceTag: redfishDataObject.System.SKU,
+                      model: redfishDataObject.System.Model,
+                      hostname: redfishDataObject.System.HostName,
+                      generation: systemGeneration,
+                      // location: serverLocation,
+                      status: "available",
+                      timestamp: "",
+                      comments: ""
+                    },
+                    { checkKeys: false },
+                    (err, res) => {
+                      if (err) {
+                        return console.log(err);
+                      }
+                      serverCount++;
+                      console.log("Server added to db");
+                      console.log("Server #", serverCount);
+                    }
+                  );
+                }
               }
             }
-          });
+          );
       })
       .catch(error => {
         console.warn(error);
