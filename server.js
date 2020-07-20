@@ -133,7 +133,19 @@ async function getRedfishData(idracIps, db) {
         // Store data from systems URL in iDRAC data object
         redfishDataObject["System"] = systemData;
 
-        return fetch_retry(locationUrl, options, 3);
+        // Check if iDRAC is 14G or higher
+        let systemGeneration = redfishDataObject.System.hasOwnProperty("Oem")
+          ? redfishDataObject.System.Oem.Dell.DellSystem.SystemGeneration
+          : "";
+
+        if (
+          systemGeneration != "" &&
+          parseInt(systemGeneration.substring(0, 2)) >= 14
+        ) {
+          return fetch_retry(locationUrl, options, 3);
+        } else {
+          return { data: "no location data fetched" };
+        }
       })
       .then(response => {
         if (response.ok) {
@@ -188,8 +200,8 @@ async function getRedfishData(idracIps, db) {
                       serviceTag: redfishDataObject.System.SKU,
                       model: redfishDataObject.System.Model,
                       hostname: redfishDataObject.System.HostName,
-                      generation: systemGeneration
-                      // location: serverLocation
+                      generation: systemGeneration,
+                      location: serverLocation
                     }
                   },
                   err => {
@@ -212,7 +224,7 @@ async function getRedfishData(idracIps, db) {
                       model: redfishDataObject.System.Model,
                       hostname: redfishDataObject.System.HostName,
                       generation: systemGeneration,
-                      // location: serverLocation,
+                      location: serverLocation,
                       status: "available",
                       timestamp: "",
                       comments: ""
