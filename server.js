@@ -179,7 +179,7 @@ async function getRedfishData(idracIps, db) {
           "Attributes"
         )
           ? `${redfishDataObject.Location.Attributes["ServerTopology.1.DataCenterName"]}-${redfishDataObject.Location.Attributes["ServerTopology.1.RackName"]}-${redfishDataObject.Location.Attributes["ServerTopology.1.RackSlot"]}`
-          : "";
+          : "--";
 
         // Add or update collection entry with iDRAC data object
         return db
@@ -192,28 +192,54 @@ async function getRedfishData(idracIps, db) {
               }
               // If an entry with the same service tag is found, update the entry
               if (results !== null) {
-                db.collection(dbColl_Servers).updateOne(
-                  { serviceTag: redfishDataObject.System.SKU },
-                  {
-                    $set: {
-                      ip: item,
-                      serviceTag: redfishDataObject.System.SKU,
-                      model: redfishDataObject.System.Model,
-                      hostname: redfishDataObject.System.HostName,
-                      generation: systemGeneration,
-                      location: serverLocation
+                // If no location data is scanned, don't update the location field
+                if (serverLocation == "--") {
+                  db.collection(dbColl_Servers).updateOne(
+                    { serviceTag: redfishDataObject.System.SKU },
+                    {
+                      $set: {
+                        ip: item,
+                        serviceTag: redfishDataObject.System.SKU,
+                        model: redfishDataObject.System.Model,
+                        hostname: redfishDataObject.System.HostName,
+                        generation: systemGeneration
+                      }
+                    },
+                    err => {
+                      if (err) {
+                        return console.log(err);
+                      }
+                      serverCount++;
+                      console.log(
+                        `Server # ${serverCount} @ ${item} updated in db`
+                      );
                     }
-                  },
-                  err => {
-                    if (err) {
-                      return console.log(err);
+                  );
+                  // If location data is scanned, include location field in update query
+                } else {
+                  db.collection(dbColl_Servers).updateOne(
+                    { serviceTag: redfishDataObject.System.SKU },
+                    {
+                      $set: {
+                        ip: item,
+                        serviceTag: redfishDataObject.System.SKU,
+                        model: redfishDataObject.System.Model,
+                        hostname: redfishDataObject.System.HostName,
+                        generation: systemGeneration,
+                        location: serverLocation
+                      }
+                    },
+                    err => {
+                      if (err) {
+                        return console.log(err);
+                      }
+                      serverCount++;
+                      console.log(
+                        `Server # ${serverCount} @ ${item} updated in db`
+                      );
                     }
-                    serverCount++;
-                    console.log(
-                      `Server # ${serverCount} @ ${item} updated in db`
-                    );
-                  }
-                );
+                  );
+                }
                 // If no entry with the same service tag is found, add a new entry
               } else {
                 if (!err) {
