@@ -3,9 +3,10 @@
 const { exec } = require('child_process');
 
 export default function getSlotPosition(ip) {
-    const errMsg = "NOT_SUPPORTED";
     const userName = "root";
     const userPass = "calvin";
+    const serverType = new Set(["22", "32", "42"]);
+    const errMsg = "NOT_SUPPORTED";
     let sysType = "";
     let sysSled = "";
 
@@ -25,7 +26,7 @@ export default function getSlotPosition(ip) {
                 sysType = stdout.split(' ')[10];
 
                 // Execute further query if the system has mutliple blades
-                if (sysType.substr(1, 1) === "2") {
+                if (serverType.has(sysType)) {
                     exec(`ipmitool  -I lanplus -H ${ip} -U ${userName} -P ${userPass} raw 0x30 0x12`, (err, stdout, stderr) => {
                         if (err || stderr) {
                             // Debugging, some error occurred
