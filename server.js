@@ -138,12 +138,14 @@ async function getRedfishData(idracIps, db) {
           ? redfishDataObject.System.Oem.Dell.DellSystem.SystemGeneration
           : "";
 
+        // If iDRAC generation was scanned and 14G or higher, run location scan
         if (
           systemGeneration != "" &&
           parseInt(systemGeneration.substring(0, 2)) >= 14
         ) {
           return fetch_retry(locationUrl, options, 3);
         } else {
+          // Else, return "no location data" JSON
           return { data: "no location data fetched" };
         }
       })
@@ -171,10 +173,12 @@ async function getRedfishData(idracIps, db) {
         // Store data from codename URL in iDRAC data object
         redfishDataObject["codeName"] = codeNameData;
 
+        // If no generation was scanned, set generation variable to ""
         let systemGeneration = redfishDataObject.System.hasOwnProperty("Oem")
           ? redfishDataObject.System.Oem.Dell.DellSystem.SystemGeneration
           : "";
 
+        // If no location was scanned, set location variable to "--"
         let serverLocation = redfishDataObject.Location.hasOwnProperty(
           "Attributes"
         )
@@ -192,7 +196,7 @@ async function getRedfishData(idracIps, db) {
               }
               // If an entry with the same service tag is found, update the entry
               if (results !== null) {
-                // If no location data is scanned, don't update the location field
+                // If no location data was scanned, don't update the location field
                 if (serverLocation == "--") {
                   db.collection(dbColl_Servers).updateOne(
                     { serviceTag: redfishDataObject.System.SKU },
@@ -215,7 +219,7 @@ async function getRedfishData(idracIps, db) {
                       );
                     }
                   );
-                  // If location data is scanned, include location field in update query
+                  // If location data was scanned, include location field in update query
                 } else {
                   db.collection(dbColl_Servers).updateOne(
                     { serviceTag: redfishDataObject.System.SKU },
