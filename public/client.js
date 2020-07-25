@@ -1,6 +1,3 @@
-// Pull-in required modules ///////////////////////////////////////////////////
-import { spawn } from 'child_process';
-
 console.log("Client side code running");
 
 // Grab each button via selector //////////////////////////////////////////////
@@ -9,20 +6,35 @@ const readButton = document.querySelector(".buttonRead");
 const scanButton = document.querySelector(".btnRunIPScan");
 
 // Set logic for each of the buttons //////////////////////////////////////////
-scanButton.addEventListener("click"), () => {
+scanButton.addEventListener("click", () => {
   console.log("Scan button clicked");
+  let resultMsg = "";
 
-  // Run a bash script to scan subnet for live iDRACs. Linux-only. 
-  const process = spawn('bash', ['./find-idracs-on-subnet.sh', '100.80.144.0/21>active_iDRAC_ips.txt']);
-
-  // Output data to console, if directed so
-  process.stdout.on('data', data => {
-    console.log(data.toString());
-  });
-
-  // Now, feed the new IP file to the backend by triggering the fetch button
-  fetchButton.click();
-};
+  fetch("/findServers", {
+    method: "POST",
+  })
+    .then((response) => {
+      if (response.ok) {
+        console.log("Now updating the database..");
+        // Now, feed the new IP file to the backend by triggering the fetch button
+        fetchButton.click();
+        resultMsg = "Scan complete, database updated."
+        return;
+      }
+      resultMsg = "Scan request failed.";
+      throw new Error(resultMsg);
+    })
+    .then(() => {
+      // Output results of the request to the browser window
+      let node = document.createElement("li");
+      let textNode = document.createTextNode(resultMsg, node);
+      node.appendChild(textNode);
+      document.getElementById("serverList").appendChild(node);
+    })
+    .catch((error) => {
+      console.log(error);
+    });
+});
 
 fetchButton.addEventListener("click", () => {
   console.log("Fetch button clicked");

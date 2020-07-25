@@ -24,6 +24,7 @@ const nodemailer = require("nodemailer");
 const crypto = require("crypto");
 const cors = require("cors");
 const morganBody = require("morgan-body");
+const spawn = require('child_process').spawn;
 
 // Declare the globals ////////////////////////////////////////////////////////
 const dbUrl = "mongodb://localhost:27017";
@@ -51,6 +52,32 @@ function readIpFile(fName) {
     .replace(/\r/g, "")
     .split("\n");
   return idracIps;
+}
+
+// Run a bash script to scan subnet for live iDRACs. Linux-only.
+function scanSubnet() {
+  return new Promise((resolve, reject) => {
+    console.log("Scan subnet function called..");
+    // Spawn a process to run the script asynchronosly
+    const process = spawn("bash", ["./find-idracs-on-subnet.sh", "100.80.144.0/21>active_iDRAC_ips.txt"]);
+
+    // Spawned process event handlers
+    // process.stdout.on("data", (data) => {
+    //   console.log(`stdout: ${data}`);
+    //   resolve({ message: "success" });
+    // });
+    process.stderr.on("data", (data) => {
+      console.log(`stderr: ${data}`);
+      reject({ message: "error" });
+    });
+    process.on("exit", (code) => {
+      console.log(`Bash script process exited with code ${code}`);
+      if (code === 0)
+        resolve({ message: "success" });
+      else
+        reject({ message: "error" });
+    });
+  });
 }
 
 /**
@@ -503,6 +530,23 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
       }
     });
 
+    // API endpoint to run bash script that finds live iDRACs on a subnet
+    app.post("/findServers", (req, res) => {
+      console.log("API to scan IPs is called..");
+      scanSubnet()
+        .then((response) => {
+          if (response.message = "success") {
+            console.log("Scan is complete, file with IPs created.");
+            return res.status(200);
+          }
+          throw new Error("Scan request failed");
+        })
+        .catch((error) => {
+          console.log(error);
+          return res.status(500);
+        });
+    });
+
     // Make call to iDRAC Redfish API and save the response data in MongoDB collection
     app.post("/postServers", (req, res) => {
       res.connection.setTimeout(0);
@@ -632,7 +676,7 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
                 password: req.body.password
               }
             },
-            function(err, results) {
+            function (err, results) {
               if (err) {
                 res.status(500).json(Object.assign({ success: false }, err));
               } else {
