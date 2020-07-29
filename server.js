@@ -638,6 +638,24 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
       );
     });
 
+    // Fetch servers checked out by a specified user
+    app.get("/getUserServers", (req, res) => {
+      _db
+        .collection(dbColl_Servers)
+        .find({ status: req.body.username })
+        .toArray(function(err, resultArray) {
+          if (err) {
+            res.status(500).json({ success: false, message: err });
+          } else {
+            res.status(200).json({
+              success: true,
+              message: "User servers successfully fetched",
+              results: resultArray
+            });
+          }
+        });
+    });
+
     // Reset password of user with specified password-reset token
     app.post("/reset", async (req, res) => {
       _db
