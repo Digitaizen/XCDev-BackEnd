@@ -5,7 +5,6 @@ const fetchButton = document.querySelector(".buttonFetch");
 const readButton = document.querySelector(".buttonRead");
 
 // Set logic for each of the buttons //////////////////////////////////////////
-
 fetchButton.addEventListener("click", () => {
   console.log("Fetch button clicked");
 
