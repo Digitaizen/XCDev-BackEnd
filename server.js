@@ -24,7 +24,7 @@ const nodemailer = require("nodemailer");
 const crypto = require("crypto");
 const cors = require("cors");
 const morganBody = require("morgan-body");
-const spawn = require('child_process').spawn;
+const { exec } = require('child_process');
 
 // Declare the globals ////////////////////////////////////////////////////////
 const dbUrl = "mongodb://localhost:27017";
@@ -58,24 +58,13 @@ function readIpFile(fName) {
 function scanSubnet() {
   return new Promise((resolve, reject) => {
     console.log("Scan subnet function called..");
-    // Spawn a process to run the script asynchronosly
-    const process = spawn("bash", ["./find-idracs-on-subnet.sh", "100.80.144.0/21>active_iDRAC_ips.txt"]);
-
-    // Spawned process event handlers
-    // process.stdout.on("data", (data) => {
-    //   console.log(`stdout: ${data}`);
-    //   resolve({ message: "success" });
-    // });
-    process.stderr.on("data", (data) => {
-      console.log(`stderr: ${data}`);
-      reject({ message: "error" });
-    });
-    process.on("exit", (code) => {
-      console.log(`Bash script process exited with code ${code}`);
-      if (code === 0)
+    // Execute a process to run the script asynchronosly
+    exec("./find-idracs-on-subnet.sh 100.80.144.0/21>active_iDRAC_ips.txt", (err, stdout, stderr) => {
+      if (err || stderr) {
+        reject({ message: stderr });
+      } else {
         resolve({ message: "success" });
-      else
-        reject({ message: "error" });
+      }
     });
   });
 }
@@ -534,16 +523,17 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
     app.post("/findServers", (req, res) => {
       console.log("API to scan IPs is called..");
       scanSubnet()
-        .then((response) => {
-          if (response.message = "success") {
-            console.log("Scan is complete, file with IPs created.");
-            return res.status(200);
+        .then(response => {
+          if (response.message === "success") {
+            console.log("Scan completed successfully.");
+            res.json({ status: true, message: "Scan is complete, file with IPs created." });
+            return;
           }
-          throw new Error("Scan request failed");
+          throw new Error();
         })
-        .catch((error) => {
-          console.log(error);
-          return res.status(500);
+        .catch(error => {
+          console.log("Scan failed with error: ", error.message);
+          res.json({ status: false, message: error.message });
         });
     });
 
