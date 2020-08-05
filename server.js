@@ -24,6 +24,7 @@ const nodemailer = require("nodemailer");
 const crypto = require("crypto");
 const cors = require("cors");
 const morganBody = require("morgan-body");
+const iDracSled = require("./ipmi-sled");
 
 // Declare the globals ////////////////////////////////////////////////////////
 const dbUrl = "mongodb://localhost:27017";
@@ -692,7 +693,7 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
                 password: req.body.password
               }
             },
-            function(err, results) {
+            function (err, results) {
               if (err) {
                 res.status(500).json(Object.assign({ success: false }, err));
               } else {
