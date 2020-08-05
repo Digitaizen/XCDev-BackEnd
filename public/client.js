@@ -4,6 +4,49 @@ console.log("Client side code running");
 const fetchButton = document.querySelector(".buttonFetch");
 const readButton = document.querySelector(".buttonRead");
 
+// Function to display result of a query in the browser window
+function displayResult(result) {
+  let node = document.createElement("li");
+  let textNode = document.createTextNode(result, node);
+  node.appendChild(textNode);
+  document.getElementById("serverList").appendChild(node);
+}
+
+// Set logic for each of the buttons //////////////////////////////////////////
+scanButton.addEventListener("click", () => {
+  console.log("Scan button clicked, calling API..");
+  let resultMsg = "";
+  // Notify user about wait-time in the browser window
+  displayResult(
+    "Scan initiated. Please, wait as it can take approximately 3+ minutes to complete, unless there's a failure."
+  );
+
+  fetch("/findServers", {
+    method: "POST"
+  })
+    .then(response => response.json())
+    .then(response => {
+      console.log("Back from API call, response.status is:", response.status);
+      if (response.status) {
+        console.log("Now updating the database..");
+        // Now, feed the new IP file to the backend by triggering the fetch button
+        fetchButton.click();
+        resultMsg = response.message;
+        // Output results of the request to the browser window
+        displayResult(resultMsg);
+        return;
+      } else {
+        resultMsg = "Scan request failed. Details: " + response.message;
+        throw new Error(resultMsg);
+      }
+    })
+    .catch(error => {
+      console.log(error);
+      // Output results of the request to the browser window
+      displayResult(error);
+    });
+});
+
 // Set logic for each of the buttons //////////////////////////////////////////
 fetchButton.addEventListener("click", () => {
   console.log("Fetch button clicked");

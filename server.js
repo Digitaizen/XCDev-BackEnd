@@ -24,6 +24,8 @@ const nodemailer = require("nodemailer");
 const crypto = require("crypto");
 const cors = require("cors");
 const morganBody = require("morgan-body");
+const { exec } = require("child_process");
+const iDracSled = require("./ipmi-sled");
 
 // Declare the globals ////////////////////////////////////////////////////////
 const dbUrl = "mongodb://localhost:27017";
@@ -51,6 +53,24 @@ function readIpFile(fName) {
     .replace(/\r/g, "")
     .split("\n");
   return idracIps;
+}
+
+// Run a bash script to scan subnet for live iDRACs. Linux-only.
+function scanSubnet() {
+  return new Promise((resolve, reject) => {
+    console.log("Scan subnet function called..");
+    // Execute a process to run the script asynchronosly
+    exec(
+      "./find-idracs-on-subnet.sh 100.80.144.0/21>active_iDRAC_ips.txt",
+      (err, stdout, stderr) => {
+        if (err || stderr) {
+          reject({ message: stderr });
+        } else {
+          resolve({ message: "success" });
+        }
+      }
+    );
+  });
 }
 
 /**
@@ -543,6 +563,27 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
       } catch {
         console.log("There was an error while registering");
       }
+    });
+
+    // API endpoint to run bash script that finds live iDRACs on a subnet
+    app.post("/findServers", (req, res) => {
+      console.log("API to scan IPs is called..");
+      scanSubnet()
+        .then(response => {
+          if (response.message === "success") {
+            console.log("Scan completed successfully.");
+            res.json({
+              status: true,
+              message: "Scan is complete, file with IPs created."
+            });
+            return;
+          }
+          throw new Error();
+        })
+        .catch(error => {
+          console.log("Scan failed with error: ", error.message);
+          res.json({ status: false, message: error.message });
+        });
     });
 
     // Make call to iDRAC Redfish API and save the response data in MongoDB collection
