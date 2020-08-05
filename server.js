@@ -24,7 +24,8 @@ const nodemailer = require("nodemailer");
 const crypto = require("crypto");
 const cors = require("cors");
 const morganBody = require("morgan-body");
-const { exec } = require('child_process');
+const { exec } = require("child_process");
+const iDracSled = require("./ipmi-sled");
 
 // Declare the globals ////////////////////////////////////////////////////////
 const dbUrl = "mongodb://localhost:27017";
@@ -59,13 +60,16 @@ function scanSubnet() {
   return new Promise((resolve, reject) => {
     console.log("Scan subnet function called..");
     // Execute a process to run the script asynchronosly
-    exec("./find-idracs-on-subnet.sh 100.80.144.0/21>active_iDRAC_ips.txt", (err, stdout, stderr) => {
-      if (err || stderr) {
-        reject({ message: stderr });
-      } else {
-        resolve({ message: "success" });
+    exec(
+      "./find-idracs-on-subnet.sh 100.80.144.0/21>active_iDRAC_ips.txt",
+      (err, stdout, stderr) => {
+        if (err || stderr) {
+          reject({ message: stderr });
+        } else {
+          resolve({ message: "success" });
+        }
       }
-    });
+    );
   });
 }
 
@@ -149,7 +153,21 @@ async function getRedfishData(idracIps, db) {
         // Store data from systems URL in iDRAC data object
         redfishDataObject["System"] = systemData;
 
-        return fetch_retry(locationUrl, options, 3);
+        // Check if iDRAC is 14G or higher
+        let systemGeneration = redfishDataObject.System.hasOwnProperty("Oem")
+          ? redfishDataObject.System.Oem.Dell.DellSystem.SystemGeneration
+          : "";
+
+        // If iDRAC generation was scanned and 14G or higher, run location scan
+        if (
+          systemGeneration != "" &&
+          parseInt(systemGeneration.substring(0, 2)) >= 14
+        ) {
+          return fetch_retry(locationUrl, options, 3);
+        } else {
+          // Else, return "no location data" JSON
+          return { data: "no location data fetched" };
+        }
       })
       .then(response => {
         if (response.ok) {
@@ -175,15 +193,17 @@ async function getRedfishData(idracIps, db) {
         // Store data from codename URL in iDRAC data object
         redfishDataObject["codeName"] = codeNameData;
 
+        // If no generation was scanned, set generation variable to ""
         let systemGeneration = redfishDataObject.System.hasOwnProperty("Oem")
           ? redfishDataObject.System.Oem.Dell.DellSystem.SystemGeneration
           : "";
 
+        // If no location was scanned, set location variable to "--"
         let serverLocation = redfishDataObject.Location.hasOwnProperty(
           "Attributes"
         )
           ? `${redfishDataObject.Location.Attributes["ServerTopology.1.DataCenterName"]}-${redfishDataObject.Location.Attributes["ServerTopology.1.RackName"]}-${redfishDataObject.Location.Attributes["ServerTopology.1.RackSlot"]}`
-          : "";
+          : "--";
 
         // Add or update collection entry with iDRAC data object
         return db
@@ -196,28 +216,54 @@ async function getRedfishData(idracIps, db) {
               }
               // If an entry with the same service tag is found, update the entry
               if (results !== null) {
-                db.collection(dbColl_Servers).updateOne(
-                  { serviceTag: redfishDataObject.System.SKU },
-                  {
-                    $set: {
-                      ip: item,
-                      serviceTag: redfishDataObject.System.SKU,
-                      model: redfishDataObject.System.Model,
-                      hostname: redfishDataObject.System.HostName,
-                      generation: systemGeneration
-                      // location: serverLocation
+                // If no location data was scanned, don't update the location field
+                if (serverLocation == "--") {
+                  db.collection(dbColl_Servers).updateOne(
+                    { serviceTag: redfishDataObject.System.SKU },
+                    {
+                      $set: {
+                        ip: item,
+                        serviceTag: redfishDataObject.System.SKU,
+                        model: redfishDataObject.System.Model,
+                        hostname: redfishDataObject.System.HostName,
+                        generation: systemGeneration
+                      }
+                    },
+                    err => {
+                      if (err) {
+                        return console.log(err);
+                      }
+                      serverCount++;
+                      console.log(
+                        `Server # ${serverCount} @ ${item} updated in db`
+                      );
                     }
-                  },
-                  err => {
-                    if (err) {
-                      return console.log(err);
+                  );
+                  // If location data was scanned, include location field in update query
+                } else {
+                  db.collection(dbColl_Servers).updateOne(
+                    { serviceTag: redfishDataObject.System.SKU },
+                    {
+                      $set: {
+                        ip: item,
+                        serviceTag: redfishDataObject.System.SKU,
+                        model: redfishDataObject.System.Model,
+                        hostname: redfishDataObject.System.HostName,
+                        generation: systemGeneration,
+                        location: serverLocation
+                      }
+                    },
+                    err => {
+                      if (err) {
+                        return console.log(err);
+                      }
+                      serverCount++;
+                      console.log(
+                        `Server # ${serverCount} @ ${item} updated in db`
+                      );
                     }
-                    serverCount++;
-                    console.log(
-                      `Server # ${serverCount} @ ${item} updated in db`
-                    );
-                  }
-                );
+                  );
+                }
                 // If no entry with the same service tag is found, add a new entry
               } else {
                 if (!err) {
@@ -228,7 +274,7 @@ async function getRedfishData(idracIps, db) {
                       model: redfishDataObject.System.Model,
                       hostname: redfishDataObject.System.HostName,
                       generation: systemGeneration,
-                      // location: serverLocation,
+                      location: serverLocation,
                       status: "available",
                       timestamp: "",
                       comments: ""
@@ -526,7 +572,10 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
         .then(response => {
           if (response.message === "success") {
             console.log("Scan completed successfully.");
-            res.json({ status: true, message: "Scan is complete, file with IPs created." });
+            res.json({
+              status: true,
+              message: "Scan is complete, file with IPs created."
+            });
             return;
           }
           throw new Error();
@@ -630,6 +679,24 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
       );
     });
 
+    // Fetch servers checked out by a specified user
+    app.get("/getUserServers", (req, res) => {
+      _db
+        .collection(dbColl_Servers)
+        .find({ status: req.body.username })
+        .toArray(function(err, resultArray) {
+          if (err) {
+            res.status(500).json({ success: false, message: err });
+          } else {
+            res.status(200).json({
+              success: true,
+              message: "User servers successfully fetched",
+              results: resultArray
+            });
+          }
+        });
+    });
+
     // Reset password of user with specified password-reset token
     app.post("/reset", async (req, res) => {
       _db
@@ -666,7 +733,7 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
                 password: req.body.password
               }
             },
-            function (err, results) {
+            function(err, results) {
               if (err) {
                 res.status(500).json(Object.assign({ success: false }, err));
               } else {

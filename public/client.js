@@ -3,7 +3,6 @@ console.log("Client side code running");
 // Grab each button via selector //////////////////////////////////////////////
 const fetchButton = document.querySelector(".buttonFetch");
 const readButton = document.querySelector(".buttonRead");
-const scanButton = document.querySelector(".btnRunIPScan");
 
 // Function to display result of a query in the browser window
 function displayResult(result) {
@@ -18,10 +17,12 @@ scanButton.addEventListener("click", () => {
   console.log("Scan button clicked, calling API..");
   let resultMsg = "";
   // Notify user about wait-time in the browser window
-  displayResult("Scan initiated. Please, wait as it can take approximately 3+ minutes to complete, unless there's a failure.");
+  displayResult(
+    "Scan initiated. Please, wait as it can take approximately 3+ minutes to complete, unless there's a failure."
+  );
 
   fetch("/findServers", {
-    method: "POST",
+    method: "POST"
   })
     .then(response => response.json())
     .then(response => {
@@ -46,20 +47,21 @@ scanButton.addEventListener("click", () => {
     });
 });
 
+// Set logic for each of the buttons //////////////////////////////////////////
 fetchButton.addEventListener("click", () => {
   console.log("Fetch button clicked");
 
   fetch("/postServers", {
-    method: "POST",
+    method: "POST"
   })
-    .then((response) => {
+    .then(response => {
       if (response.ok) {
         console.log("server data added");
         return;
       }
       throw new Error("Request Failed");
     })
-    .catch((error) => {
+    .catch(error => {
       console.log(error);
     });
 });
@@ -68,17 +70,17 @@ readButton.addEventListener("click", () => {
   console.log("Read button clicked");
 
   fetch("/getServers", {
-    method: "GET",
+    method: "GET"
   })
-    .then((response) => {
+    .then(response => {
       if (response.ok) {
         console.log("server data retrieved");
         return response.json();
       }
       throw new Error("Request Failed");
     })
-    .then((data) => {
-      data.map((item) => {
+    .then(data => {
+      data.map(item => {
         var node = document.createElement("LI");
         var textNode = document.createTextNode(
           String(
@@ -89,7 +91,7 @@ readButton.addEventListener("click", () => {
         document.getElementById("serverList").appendChild(node);
       });
     })
-    .catch((error) => {
+    .catch(error => {
       console.log(error);
     });
 });
