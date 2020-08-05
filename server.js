@@ -680,10 +680,10 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
     });
 
     // Fetch servers checked out by a specified user
-    app.get("/getUserServers", (req, res) => {
+    app.get("/getUserServers/:name", (req, res) => {
       _db
         .collection(dbColl_Servers)
-        .find({ status: req.body.username })
+        .find({ status: req.params.name })
         .toArray(function(err, resultArray) {
           if (err) {
             res.status(500).json({ success: false, message: err });
