@@ -3,6 +3,7 @@ console.log("Client side code running");
 // Grab each button via selector //////////////////////////////////////////////
 const fetchButton = document.querySelector(".buttonFetch");
 const readButton = document.querySelector(".buttonRead");
+const scanButton = document.querySelector(".btnRunIPScan");
 
 // Function to display result of a query in the browser window
 function displayResult(result) {
