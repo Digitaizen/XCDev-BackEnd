@@ -26,6 +26,7 @@ const cors = require("cors");
 const morganBody = require("morgan-body");
 const { exec } = require("child_process");
 const iDracSled = require("./ipmi-sled");
+const readdirp = require("readdirp");
 
 // Declare the globals ////////////////////////////////////////////////////////
 const dbUrl = "mongodb://localhost:27017";
@@ -697,6 +698,63 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
               success: true,
               message: "User servers successfully fetched",
               results: resultArray
+            });
+          }
+        });
+    });
+
+    // Fetch names of .iso files from given directory path
+    app.get("/getIsoFiles", (req, res) => {
+      // Define settings for readdirp
+      var settings = {
+        // Only search for files with '.iso' extension
+        fileFilter: "*.iso"
+      };
+
+      // Declare array to hold .iso filenames
+      var isoFilePaths = [];
+
+      // Declare success and message variables for response
+      let successValue = null;
+      let messageValue = null;
+
+      // Iterate recursively through given path
+      readdirp(req.body.path, settings)
+        .on("data", function(entry) {
+          // Push .iso filename to array
+          isoFilePaths.push(entry);
+        })
+        .on("warn", function(warn) {
+          // Set success to false and message to warning
+          console.log("Warning: ", warn);
+          successValue = false;
+          messageValue = warn;
+        })
+        .on("error", function(err) {
+          // Set success to false and message to error
+          console.log("Error: ", err);
+          successValue = false;
+          messageValue = err;
+        })
+        .on("end", function(err) {
+          // If success is false, send warning/error response
+          if (successValue == false) {
+            res.status(500).json({
+              success: false,
+              message: messageValue
+            });
+            // Else, send response with array of .iso filenames
+          } else {
+            var optionsIsoFile = isoFilePaths.map(isoFilepath => {
+              return {
+                value: isoFilepath.basename,
+                label: isoFilepath.basename
+              };
+            });
+            res.status(200).json({
+              success: true,
+              message: "ISO file paths successfully fetched",
+              results: optionsIsoFile
             });
           }
         });
