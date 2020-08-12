@@ -26,6 +26,7 @@ const cors = require("cors");
 const morganBody = require("morgan-body");
 const { exec } = require("child_process");
 const iDracSled = require("./ipmi-sled");
+const readdirp = require("readdirp");
 
 // Declare the globals ////////////////////////////////////////////////////////
 const dbUrl = "mongodb://localhost:27017";
@@ -168,32 +169,37 @@ async function getRedfishData(idracIps, db) {
         // Store data from systems URL in iDRAC data object
         redfishDataObject["System"] = systemData;
 
-        // Check if iDRAC is 14G or higher
-        let systemGeneration = redfishDataObject.System.hasOwnProperty("Oem")
-          ? redfishDataObject.System.Oem.Dell.DellSystem.SystemGeneration
-          : "";
+        /**
+         * DELLXCDEV-113
+         *
+         * Location scanning logic commented out in lines 161-186, 206-211, 224-248, 258, 271, 282
+         */
+        //   // Check if iDRAC is 14G or higher
+        //   let systemGeneration = redfishDataObject.System.hasOwnProperty("Oem")
+        //     ? redfishDataObject.System.Oem.Dell.DellSystem.SystemGeneration
+        //     : "";
 
-        // If iDRAC generation was scanned and 14G or higher, run location scan
-        if (
-          systemGeneration != "" &&
-          parseInt(systemGeneration.substring(0, 2)) >= 14
-        ) {
-          return fetch_retry(locationUrl, options, 3);
-        } else {
-          // Else, return "no location data" JSON
-          return { data: "no location data fetched" };
-        }
-      })
-      .then(response => {
-        if (response.ok) {
-          return response.json();
-        } else {
-          return { error: "No location data available" };
-        }
-      })
-      .then(locationData => {
-        // Store data from location URL in iDRAC data object
-        redfishDataObject["Location"] = locationData;
+        //   // If iDRAC generation was scanned and 14G or higher, run location scan
+        //   if (
+        //     systemGeneration != "" &&
+        //     parseInt(systemGeneration.substring(0, 2)) >= 14
+        //   ) {
+        //     return fetch_retry(locationUrl, options, 3);
+        //   } else {
+        //     // Else, return "no location data" JSON
+        //     return { data: "no location data fetched" };
+        //   }
+        // })
+        // .then(response => {
+        //   if (response.ok) {
+        //     return response.json();
+        //   } else {
+        //     return { error: "No location data available" };
+        //   }
+        // })
+        // .then(locationData => {
+        //   // Store data from location URL in iDRAC data object
+        //   redfishDataObject["Location"] = locationData;
 
         return fetch_retry(codeNameUrl, options, 3);
       })
@@ -213,12 +219,12 @@ async function getRedfishData(idracIps, db) {
           ? redfishDataObject.System.Oem.Dell.DellSystem.SystemGeneration
           : "";
 
-        // If no location was scanned, set location variable to "--"
-        let serverLocation = redfishDataObject.Location.hasOwnProperty(
-          "Attributes"
-        )
-          ? `${redfishDataObject.Location.Attributes["ServerTopology.1.DataCenterName"]}-${redfishDataObject.Location.Attributes["ServerTopology.1.RackName"]}-${redfishDataObject.Location.Attributes["ServerTopology.1.RackSlot"]}`
-          : "--";
+        // // If no location was scanned, set location variable to "--"
+        // let serverLocation = redfishDataObject.Location.hasOwnProperty(
+        //   "Attributes"
+        // )
+        //   ? `${redfishDataObject.Location.Attributes["ServerTopology.1.DataCenterName"]}-${redfishDataObject.Location.Attributes["ServerTopology.1.RackName"]}-${redfishDataObject.Location.Attributes["ServerTopology.1.RackSlot"]}`
+        //   : "--";
 
         // Add or update collection entry with iDRAC data object
         return db
@@ -231,56 +237,55 @@ async function getRedfishData(idracIps, db) {
               }
               // If an entry with the same service tag is found, update the entry
               if (results !== null) {
-                // If no location data was scanned, don't update the location field
-                if (serverLocation == "--") {
-                  db.collection(dbColl_Servers).updateOne(
-                    { serviceTag: redfishDataObject.System.SKU },
-                    {
-                      $set: {
-                        ip: item,
-                        serviceTag: redfishDataObject.System.SKU,
-                        firmwareVersion: redfishDataObject.fw.FirmwareVersion,
-                        model: redfishDataObject.System.Model,
-                        hostname: redfishDataObject.System.HostName,
-                        generation: systemGeneration
-                      }
-                    },
-                    err => {
-                      if (err) {
-                        return console.log(err);
-                      }
-                      serverCount++;
-                      console.log(
-                        `Server # ${serverCount} @ ${item} updated in db`
-                      );
+                // // If no location data was scanned, don't update the location field
+                // if (serverLocation == "--") {
+                //   db.collection(dbColl_Servers).updateOne(
+                //     { serviceTag: redfishDataObject.System.SKU },
+                //     {
+                //       $set: {
+                //         ip: item,
+                //         serviceTag: redfishDataObject.System.SKU,
+                //         model: redfishDataObject.System.Model,
+                //         hostname: redfishDataObject.System.HostName,
+                //         generation: systemGeneration
+                //       }
+                //     },
+                //     err => {
+                //       if (err) {
+                //         return console.log(err);
+                //       }
+                //       serverCount++;
+                //       console.log(
+                //         `Server # ${serverCount} @ ${item} updated in db`
+                //       );
+                //     }
+                //   );
+                //   // If location data was scanned, include location field in update query
+                // } else {
+                db.collection(dbColl_Servers).updateOne(
+                  { serviceTag: redfishDataObject.System.SKU },
+                  {
+                    $set: {
+                      ip: item,
+                      serviceTag: redfishDataObject.System.SKU,
+                      firmwareVersion: redfishDataObject.fw.FirmwareVersion,
+                      model: redfishDataObject.System.Model,
+                      hostname: redfishDataObject.System.HostName,
+                      generation: systemGeneration
+                      // location: serverLocation
                     }
-                  );
-                  // If location data was scanned, include location field in update query
-                } else {
-                  db.collection(dbColl_Servers).updateOne(
-                    { serviceTag: redfishDataObject.System.SKU },
-                    {
-                      $set: {
-                        ip: item,
-                        serviceTag: redfishDataObject.System.SKU,
-                        firmwareVersion: redfishDataObject.fw.FirmwareVersion,
-                        model: redfishDataObject.System.Model,
-                        hostname: redfishDataObject.System.HostName,
-                        generation: systemGeneration,
-                        location: serverLocation
-                      }
-                    },
-                    err => {
-                      if (err) {
-                        return console.log(err);
-                      }
-                      serverCount++;
-                      console.log(
-                        `Server # ${serverCount} @ ${item} updated in db`
-                      );
+                  },
+                  err => {
+                    if (err) {
+                      return console.log(err);
                     }
-                  );
-                }
+                    serverCount++;
+                    console.log(
+                      `Server # ${serverCount} @ ${item} updated in db`
+                    );
+                  }
+                );
+                // }
                 // If no entry with the same service tag is found, add a new entry
               } else {
                 if (!err) {
@@ -288,10 +293,11 @@ async function getRedfishData(idracIps, db) {
                     {
                       ip: item,
                       serviceTag: redfishDataObject.System.SKU,
+                      firmwareVersion: redfishDataObject.fw.FirmwareVersion,
                       model: redfishDataObject.System.Model,
                       hostname: redfishDataObject.System.HostName,
                       generation: systemGeneration,
-                      location: serverLocation,
+                      // location: serverLocation,
                       status: "available",
                       timestamp: "",
                       comments: ""
@@ -697,10 +703,10 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
     });
 
     // Fetch servers checked out by a specified user
-    app.get("/getUserServers", (req, res) => {
+    app.get("/getUserServers/:name", (req, res) => {
       _db
         .collection(dbColl_Servers)
-        .find({ status: req.body.username })
+        .find({ status: req.params.name })
         .toArray(function(err, resultArray) {
           if (err) {
             res.status(500).json({ success: false, message: err });
@@ -709,6 +715,63 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
               success: true,
               message: "User servers successfully fetched",
               results: resultArray
+            });
+          }
+        });
+    });
+
+    // Fetch names of .iso files from given directory path
+    app.get("/getIsoFiles", (req, res) => {
+      // Define settings for readdirp
+      var settings = {
+        // Only search for files with '.iso' extension
+        fileFilter: "*.iso"
+      };
+
+      // Declare array to hold .iso filenames
+      var isoFilePaths = [];
+
+      // Declare success and message variables for response
+      let successValue = null;
+      let messageValue = null;
+
+      // Iterate recursively through given path
+      readdirp(req.body.path, settings)
+        .on("data", function(entry) {
+          // Push .iso filename to array
+          isoFilePaths.push(entry);
+        })
+        .on("warn", function(warn) {
+          // Set success to false and message to warning
+          console.log("Warning: ", warn);
+          successValue = false;
+          messageValue = warn;
+        })
+        .on("error", function(err) {
+          // Set success to false and message to error
+          console.log("Error: ", err);
+          successValue = false;
+          messageValue = err;
+        })
+        .on("end", function(err) {
+          // If success is false, send warning/error response
+          if (successValue == false) {
+            res.status(500).json({
+              success: false,
+              message: messageValue
+            });
+            // Else, send response with array of .iso filenames
+          } else {
+            var optionsIsoFile = isoFilePaths.map(isoFilepath => {
+              return {
+                value: isoFilepath.basename,
+                label: isoFilepath.basename
+              };
+            });
+            res.status(200).json({
+              success: true,
+              message: "ISO file paths successfully fetched",
+              results: optionsIsoFile
             });
           }
         });

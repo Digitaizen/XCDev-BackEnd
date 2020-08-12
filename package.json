@@ -45,6 +45,7 @@
     "prettier": "^1.19.1",
     "react": "^16.13.1",
     "react-dom": "^16.13.1",
+    "readdirp": "^3.4.0",
     "validator": "^13.0.0"
   },
   "devDependencies": {
