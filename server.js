@@ -101,6 +101,7 @@ async function getRedfishData(idracIps, db) {
 
     // Define the URLs to be fetched from
     let v1Url = "https://" + item + "/redfish/v1";
+    let fwUrl = "https://" + item + "/redfish/v1/Managers/iDRAC.Embedded.1";
     let systemUrl = "https://" + item + "/redfish/v1/Systems/System.Embedded.1";
     let locationUrl =
       "https://" +
@@ -139,6 +140,20 @@ async function getRedfishData(idracIps, db) {
       .then(v1Data => {
         // Store data from v1 URL in iDRAC data object
         redfishDataObject["v1"] = v1Data;
+
+        // Make fetch call on firmware URL
+        return fetch_retry(fwUrl, options, 3);
+      })
+      .then(response => {
+        if (response.ok) {
+          return response.json();
+        } else {
+          return Promise.reject(response);
+        }
+      })
+      .then(fwData => {
+        // Store data from fw URL in iDRAC data object
+        redfishDataObject["fw"] = fwData;
 
         // Make fetch call on systems URL
         return fetch_retry(systemUrl, options, 3);
@@ -253,6 +268,7 @@ async function getRedfishData(idracIps, db) {
                     $set: {
                       ip: item,
                       serviceTag: redfishDataObject.System.SKU,
+                      firmwareVersion: redfishDataObject.fw.FirmwareVersion,
                       model: redfishDataObject.System.Model,
                       hostname: redfishDataObject.System.HostName,
                       generation: systemGeneration
@@ -277,6 +293,7 @@ async function getRedfishData(idracIps, db) {
                     {
                       ip: item,
                       serviceTag: redfishDataObject.System.SKU,
+                      firmwareVersion: redfishDataObject.fw.FirmwareVersion,
                       model: redfishDataObject.System.Model,
                       hostname: redfishDataObject.System.HostName,
                       generation: systemGeneration,
