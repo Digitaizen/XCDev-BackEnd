@@ -707,10 +707,16 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
       _db
         .collection(dbColl_Servers)
         .find({ status: req.params.name })
-        .toArray(function(err, resultArray) {
+        .toArray(function(err, servers) {
           if (err) {
             res.status(500).json({ success: false, message: err });
           } else {
+            // If firmware version is older than 3.21.26.22, exclude server from results
+            let resultArray = servers.filter(
+              server =>
+                parseInt(server.firmwareVersion.split(".").join("")) >= 3212622
+            );
+            // Return array of servers belonging to specified user
             res.status(200).json({
               success: true,
               message: "User servers successfully fetched",
