@@ -746,17 +746,24 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
     });
 
     // Fetch names of .iso files from given directory path
-    app.get("/getIsoFiles", async (req, res) => {
-      let optionsIsoFile = [];
+    app.get("/getIsoFiles", (req, res) => {
+      let optionsIsoFiles = [];
 
       const myShellScript = exec("sh mapSharedDrive.sh ./");
       myShellScript.stdout.on("data", (data) => {
         console.log(data);
-        optionsIsoFile.push(data);
+        optionsIsoFiles.push(data);
         // do whatever you want here with data
       });
       myShellScript.stderr.on("data", (data) => {
         console.error(data);
+      });
+
+      const optionsIsoFile = optionsIsoFiles.map((name) => {
+        return {
+          value: isoFilepath.basename,
+          label: isoFilepath.basename,
+        };
       });
 
       // // Define settings for readdirp
