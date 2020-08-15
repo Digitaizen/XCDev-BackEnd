@@ -747,44 +747,18 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
 
     // Fetch names of .iso files from given directory path
     app.get("/getIsoFiles", async (req, res) => {
-      // For Windows Users
-      // let factoryBlock = [];
-      //initialize a shell instance
-      // const ps = new Shell({
-      //   executionPolicy: "Bypass",
-      //   noProfile: true,
-      // });
+      let optionsIsoFile = [];
 
-      // ps.addCommand("./shareDriveAccess.ps1");
-      // ps.invoke()
-      //   .then((output) => {
-      //     factoryBlock.push(output);
-      //     console.log(output);
-      //   })
-      //   .catch((err) => {
-      //     console.log(err);
-      //     ps.dispose();
-      //   });
-
-      let factoryBlock = await getFactoryBlock();
-
-      var optionsFactoryBlock = factoryBlock.map((folderName) => {
-        return {
-          value: folderName,
-          label: folderName,
-        };
+      const myShellScript = exec("sh mapSharedDrive.sh ./");
+      myShellScript.stdout.on("data", (data) => {
+        console.log(data);
+        optionsIsoFile.push(data);
+        // do whatever you want here with data
       });
-      // const myPowerShellScript = exec("shareDriveAccess.ps1 ./");
-      // myShellScript.stdout.on("data", (data) => {
-      //   console.log(data);
-      //   // do whatever you want here with data
-      // });
-      // myShellScript.stderr.on("data", (data) => {
-      //   console.error(data);
-      // });
+      myShellScript.stderr.on("data", (data) => {
+        console.error(data);
+      });
 
-      // Windows Users Path
-      // const path = "X:\\";
       // // Define settings for readdirp
       // var settings = {
       //   // Only search for files with '.iso' extension
@@ -835,8 +809,8 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
       res.status(200).json({
         success: true,
         message: "ISO file paths successfully fetched",
-        // results: optionsIsoFile,
-        results: optionsFactoryBlock,
+        results: optionsIsoFile,
+        // results: optionsFactoryBlock,
       });
     });
 
