@@ -27,6 +27,7 @@ const morganBody = require("morgan-body");
 const { exec } = require("child_process");
 const iDracSled = require("./ipmi-sled");
 const readdirp = require("readdirp");
+const Shell = require("node-powershell");
 
 // Declare the globals ////////////////////////////////////////////////////////
 const dbUrl = "mongodb://localhost:27017";
@@ -406,6 +407,30 @@ function validateRegisterInput(data) {
   };
 }
 
+async function getFactoryBlock() {
+  return new Promise(function (resolve, reject) {
+    let factoryBlock = [];
+
+    const ps = new Shell({
+      executionPolicy: "Bypass",
+      noProfile: true,
+    });
+
+    ps.addCommand("./shareDriveAccess.ps1");
+    ps.invoke()
+      .then((output) => {
+        factoryBlock.push(output);
+        console.log(output);
+      })
+      .catch((err) => {
+        console.log(err);
+        ps.dispose();
+      });
+
+    resolve(factoryBlock);
+  });
+}
+
 // Launch the server //////////////////////////////////////////////////////////
 console.log("Launching the backend server..");
 
@@ -721,72 +746,98 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
     });
 
     // Fetch names of .iso files from given directory path
-    app.get("/getIsoFiles", (req, res) => {
-      const myPowerShellScript = exec("shareDriveAccess.ps1 ./");
-      myShellScript.stdout.on("data", (data) => {
-        console.log(data);
-        // do whatever you want here with data
+    app.get("/getIsoFiles", async (req, res) => {
+      // For Windows Users
+      // let factoryBlock = [];
+      //initialize a shell instance
+      // const ps = new Shell({
+      //   executionPolicy: "Bypass",
+      //   noProfile: true,
+      // });
+
+      // ps.addCommand("./shareDriveAccess.ps1");
+      // ps.invoke()
+      //   .then((output) => {
+      //     factoryBlock.push(output);
+      //     console.log(output);
+      //   })
+      //   .catch((err) => {
+      //     console.log(err);
+      //     ps.dispose();
+      //   });
+
+      let factoryBlock = await getFactoryBlock();
+
+      var optionsFactoryBlock = factoryBlock.map((folderName) => {
+        return {
+          value: folderName,
+          label: folderName,
+        };
       });
-      myShellScript.stderr.on("data", (data) => {
-        console.error(data);
-      });
+      // const myPowerShellScript = exec("shareDriveAccess.ps1 ./");
+      // myShellScript.stdout.on("data", (data) => {
+      //   console.log(data);
+      //   // do whatever you want here with data
+      // });
+      // myShellScript.stderr.on("data", (data) => {
+      //   console.error(data);
+      // });
 
       // Windows Users Path
-      const path = "X:\\";
-      // Define settings for readdirp
-      var settings = {
-        // Only search for files with '.iso' extension
-        fileFilter: "*.iso",
-      };
+      // const path = "X:\\";
+      // // Define settings for readdirp
+      // var settings = {
+      //   // Only search for files with '.iso' extension
+      //   fileFilter: "*.iso",
+      // };
 
-      // Declare array to hold .iso filenames
-      var isoFilePaths = [];
+      // // Declare array to hold .iso filenames
+      // var isoFilePaths = [];
 
-      // Declare success and message variables for response
-      let successValue = null;
-      let messageValue = null;
+      // // Declare success and message variables for response
+      // let successValue = null;
+      // let messageValue = null;
 
       // Iterate recursively through given path
       // readdirp(req.body.path, settings)
-      readdirp(path, settings)
-        .on("data", function (entry) {
-          // Push .iso filename to array
-          isoFilePaths.push(entry);
-        })
-        .on("warn", function (warn) {
-          // Set success to false and message to warning
-          console.log("Warning: ", warn);
-          successValue = false;
-          messageValue = warn;
-        })
-        .on("error", function (err) {
-          // Set success to false and message to error
-          console.log("Error: ", err);
-          successValue = false;
-          messageValue = err;
-        })
-        .on("end", function (err) {
-          // If success is false, send warning/error response
-          if (successValue == false) {
-            res.status(500).json({
-              success: false,
-              message: messageValue,
-            });
-            // Else, send response with array of .iso filenames
-          } else {
-            var optionsIsoFile = isoFilePaths.map((isoFilepath) => {
-              return {
-                value: isoFilepath.basename,
-                label: isoFilepath.basename,
-              };
-            });
-            res.status(200).json({
-              success: true,
-              message: "ISO file paths successfully fetched",
-              results: optionsIsoFile,
-            });
-          }
-        });
+      // readdirp(path, settings)
+      //   .on("data", function (entry) {
+      //     // Push .iso filename to array
+      //     isoFilePaths.push(entry);
+      //   })
+      //   .on("warn", function (warn) {
+      //     // Set success to false and message to warning
+      //     console.log("Warning: ", warn);
+      //     successValue = false;
+      //     messageValue = warn;
+      //   })
+      //   .on("error", function (err) {
+      //     // Set success to false and message to error
+      //     console.log("Error: ", err);
+      //     successValue = false;
+      //     messageValue = err;
+      //   })
+      //   .on("end", function (err) {
+      //     // If success is false, send warning/error response
+      //     if (successValue == false) {
+      //       res.status(500).json({
+      //         success: false,
+      //         message: messageValue,
+      //       });
+      //       // Else, send response with array of .iso filenames
+      //     } else {
+      //       var optionsIsoFile = isoFilePaths.map((isoFilepath) => {
+      //         return {
+      //           value: isoFilepath.basename,
+      //           label: isoFilepath.basename,
+      //         };
+      //       });
+      res.status(200).json({
+        success: true,
+        message: "ISO file paths successfully fetched",
+        // results: optionsIsoFile,
+        results: optionsFactoryBlock,
+      });
     });
 
     // Reset password of user with specified password-reset token
