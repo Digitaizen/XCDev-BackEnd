@@ -20,14 +20,16 @@ const keys = require("./config/keys");
 const Validator = require("validator");
 const isEmpty = require("is-empty");
 const async = require("async");
-const nodemailer = require("nodemailer");
+// const nodemailer = require("nodemailer");
 const crypto = require("crypto");
 const cors = require("cors");
 const morganBody = require("morgan-body");
 const { exec } = require("child_process");
 const iDracSled = require("./ipmi-sled");
-const readdirp = require("readdirp");
+// const readdirp = require("readdirp");
 const Shell = require("node-powershell");
+const { get } = require("http");
+const { readdirSync } = require('fs')
 
 // Declare the globals ////////////////////////////////////////////////////////
 const dbUrl = "mongodb://localhost:27017";
@@ -747,25 +749,39 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
 
     // Fetch names of .iso files from given directory path
     app.get("/getIsoFiles", (req, res) => {
-      let optionsIsoFiles = [];
+      // let optionsIsoFiles = [];
 
+      // const myShellScript = exec("sh mapSharedDrive.sh ./");
+      // myShellScript.stdout.on("data", (data) => {
+      //   console.log(data);
+      //   optionsIsoFiles.push(data);
+      //   // do whatever you want here with data
+      // });
+      // myShellScript.stderr.on("data", (data) => {
+      //   console.error(data);
+      // });
       const myShellScript = exec("sh mapSharedDrive.sh ./");
       myShellScript.stdout.on("data", (data) => {
-        console.log(data);
-        optionsIsoFiles.push(data);
-        // do whatever you want here with data
+        console.log("success:" + data);
       });
       myShellScript.stderr.on("data", (data) => {
         console.error(data);
       });
 
-      const optionsIsoFile = optionsIsoFiles.map((name) => {
-        return {
-          value: isoFilepath.basename,
-          label: isoFilepath.basename,
-        };
-      });
+let source = "/mnt/nightFlyter";
 
+const getDirectories = source =>
+  readdirSync(source, { withFileTypes: true })
+    .filter(dirent => dirent.isDirectory())
+    .map(dirent => {
+      return {
+        value: dirent.name,
+        label: dirent.name,
+      };
+    })
+
+    let optionsIsoFile = getDirectories(source)
+    
       // // Define settings for readdirp
       // var settings = {
       //   // Only search for files with '.iso' extension
