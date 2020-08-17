@@ -29,7 +29,7 @@ const iDracSled = require("./ipmi-sled");
 // const readdirp = require("readdirp");
 const Shell = require("node-powershell");
 const { get } = require("http");
-const { readdirSync } = require("fs");
+const { readdirSync, statSync } = require("fs");
 
 // Declare the globals ////////////////////////////////////////////////////////
 const dbUrl = "mongodb://localhost:27017";
@@ -829,35 +829,90 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
 
     // Fetch names of .iso files from given directory path
     app.get("/getBmrIso", (req, res) => {
-      const path = require("path");
-      let source = "/mnt/nightFlyter";
+      // const path = require("path");
+      const myShellScript = exec("sh mapSharedDrive.sh ./");
+      myShellScript.stdout.on("data", (data) => {
+        console.log("success:" + data);
+      });
+      myShellScript.stderr.on("data", (data) => {
+        console.error(data);
+      });
 
-      const getIsoFiles = function (dirPath, arrayOfFiles) {
-        files = fs.readdirSync(dirPath);
+      let path = "/mnt/nightFlyter";
 
-        arrayOfFiles = arrayOfFiles || [];
-
-        files.forEach(function (file) {
-          if (fs.statSync(dirPath + "/" + file).isDirectory()) {
-            arrayOfFiles = getAllFiles(dirPath + "/" + file, arrayOfFiles);
-          } else {
-            arrayOfFiles.push(path.join(__dirname, dirPath, "/", file));
-          }
-        });
-
-        return arrayOfFiles.map((file) => {
-          return {
-            value: file.name,
-            label: file.name,
-          };
-        });
+       // Define settings for readdirp
+      var settings = {
+        // Only search for files with '.iso' extension
+        fileFilter: "*.iso",
       };
+
+      // Declare array to hold .iso filenames
+      var isoFilePaths = [];
+
+      // Declare success and message variables for response
+      let successValue = null;
+      let messageValue = null;
+
+      // Iterate recursively through given path
+      readdirp(path, settings)
+        .on("data", function (entry) {
+          // Push .iso filename to array
+          isoFilePaths.push(entry);
+        })
+        .on("warn", function (warn) {
+          // Set success to false and message to warning
+          console.log("Warning: ", warn);
+          successValue = false;
+          messageValue = warn;
+        })
+        .on("error", function (err) {
+          // Set success to false and message to error
+          console.log("Error: ", err);
+          successValue = false;
+          messageValue = err;
+        })
+        .on("end", function (err) {
+          // If success is false, send warning/error response
+          if (successValue == false) {
+            res.status(500).json({
+              success: false,
+              message: messageValue,
+            });
+            // Else, send response with array of .iso filenames
+          } else {
+            var optionsIsoFile = isoFilePaths.map((isoFilepath) => {
+              return {
+                value: isoFilepath.basename,
+                label: isoFilepath.basename,
+              };
+            });
+
+      // const getIsoFiles = function (dirPath, arrayOfFiles) {
+      //   let files = readdirSync(dirPath);
+
+      //   let arrayOfFiles = arrayOfFiles || [];
+
+      //   files.forEach(function (file) {
+      //     if (statSync(dirPath + "/" + file).isDirectory()) {
+      //       arrayOfFiles = getAllFiles(dirPath + "/" + file, arrayOfFiles);
+      //     } else {
+      //       arrayOfFiles.push(path.join(__dirname, dirPath, "/", file));
+      //     }
+      //   });
+
+      //   return arrayOfFiles.map((file) => {
+      //     return {
+      //       value: file.name,
+      //       label: file.name,
+      //     };
+      //   });
+      // };
 
       // return {
       //   value: dirent.name,
       //   label: dirent.name,
 
-      let optionsIsoFile = getIsoFiles(source);
+      // let optionsIsoFile = getIsoFiles(source);
       res.status(200).json({
         success: true,
         message: "ISO file paths successfully fetched",
