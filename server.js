@@ -839,86 +839,6 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
         console.error(data);
       });
 
-      // let source = "/mnt/nightFlyter";
-
-      // const getDirectories = (source) =>
-      //   readdirSync(source, { withFileTypes: true })
-      //     .filter((dirent) => console.log(dirent))
-      //     .map((dirent) => {
-      //       return {
-      //         value: dirent.name,
-      //         label: dirent.name,
-      //       };
-      //     });
-
-      // let optionsIsoFile = getDirectories(source);
-
-      // res.status(200).json({
-      //   success: true,
-      //   message: "ISO file paths successfully fetched",
-      //   results: optionsIsoFile,
-      //   // results: optionsFactoryBlock,
-      // });
-
-      // const path = require("path");
-      // const myShellScript = exec("sh mapSharedDrive.sh ./");
-      // myShellScript.stdout.on("data", (data) => {
-      //   console.log("success:" + data);
-      // });
-      // myShellScript.stderr.on("data", (data) => {
-      //   console.error(data);
-      // });
-
-      // let path = "/mnt/nightFlyter";
-
-      // // Define settings for readdirp
-      // var settings = {
-      //   // Only search for files with '.iso' extension
-      //   fileFilter: "*.iso",
-      // };
-
-      // // Declare array to hold .iso filenames
-      // var isoFilePaths = [];
-
-      // // Declare success and message variables for response
-      // let successValue = null;
-      // let messageValue = null;
-
-      // // Iterate recursively through given path
-      // readdirp(path, settings)
-      //   .on("data", function (entry) {
-      //     // Push .iso filename to array
-      //     isoFilePaths.push(entry);
-      //   })
-      //   .on("warn", function (warn) {
-      //     // Set success to false and message to warning
-      //     console.log("Warning: ", warn);
-      //     successValue = false;
-      //     messageValue = warn;
-      //   })
-      //   .on("error", function (err) {
-      //     // Set success to false and message to error
-      //     console.log("Error: ", err);
-      //     successValue = false;
-      //     messageValue = err;
-      //   })
-      //   .on("end", function (err) {
-      //     // If success is false, send warning/error response
-      //     if (successValue == false) {
-      //       res.status(500).json({
-      //         success: false,
-      //         message: messageValue,
-      //       });
-      //       // Else, send response with array of .iso filenames
-      //     } else {
-      //       var optionsIsoFile = isoFilePaths.map((isoFilepath) => {
-      //         return {
-      //           value: isoFilepath.basename,
-      //           label: isoFilepath.basename,
-      //         };
-      //       });
-      //     }
-
       const getIsoFiles = function (dirPath) {
         let files = readdirSync(dirPath);
         let arrayOfFiles = [];
@@ -926,11 +846,6 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
           let extension = name.endsWith("iso");
           if (extension === true) {
             arrayOfFiles.push(name);
-            // console.log(name);
-            // return {
-            //   value: name,
-            //   label: name,
-            // };
           }
         });
         return arrayOfFiles.map((fileName) => {
@@ -941,23 +856,6 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
         });
       };
 
-      // let arrayOfFiles = arrayOfFiles || [];
-
-      // files.forEach(function (file) {
-      //   if (statSync(dirPath + "/" + file).isDirectory()) {
-      //     arrayOfFiles = getAllFiles(dirPath + "/" + file, arrayOfFiles);
-      //   } else {
-      //     arrayOfFiles.push(path.join(__dirname, dirPath, "/", file));
-      //   }
-      // });
-
-      //   return arrayOfFiles.map((file) => {
-      //     return {
-      //       value: file.name,
-      //       label: file.name,
-      //     };
-      //   });
-      // };
       console.log(source);
       let optionsIsoFile = getIsoFiles(source);
       console.log(optionsIsoFile);
@@ -967,10 +865,6 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
         message: "ISO file paths successfully fetched",
         results: optionsIsoFile,
       });
-
-      // return {
-      //   value: dirent.name,
-      //   label: dirent.name,
     });
 
     // Reset password of user with specified password-reset token
