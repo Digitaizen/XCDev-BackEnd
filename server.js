@@ -29,7 +29,7 @@ const iDracSled = require("./ipmi-sled");
 // const readdirp = require("readdirp");
 const Shell = require("node-powershell");
 const { get } = require("http");
-const { readdirSync } = require('fs')
+const { readdirSync } = require("fs");
 
 // Declare the globals ////////////////////////////////////////////////////////
 const dbUrl = "mongodb://localhost:27017";
@@ -768,20 +768,20 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
         console.error(data);
       });
 
-let source = "/mnt/nightFlyter";
+      let source = "/mnt/nightFlyter";
 
-const getDirectories = source =>
-  readdirSync(source, { withFileTypes: true })
-    .filter(dirent => dirent.isDirectory())
-    .map(dirent => {
-      return {
-        value: dirent.name,
-        label: dirent.name,
-      };
-    })
+      const getDirectories = (source) =>
+        readdirSync(source, { withFileTypes: true })
+          .filter((dirent) => dirent.isDirectory())
+          .map((dirent) => {
+            return {
+              value: dirent.name,
+              label: dirent.name,
+            };
+          });
 
-    let optionsIsoFile = getDirectories(source)
-    
+      let optionsIsoFile = getDirectories(source);
+
       // // Define settings for readdirp
       // var settings = {
       //   // Only search for files with '.iso' extension
