@@ -747,20 +747,9 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
         });
     });
 
-    // Fetch names of .iso files from given directory path
+    // Fetch names of all the folders listed for Factory Block on the XC Night Flyer Share
     // app.get("/getIsoFiles", (req, res) => {
     app.get("/getFactoryBlock", (req, res) => {
-      // let optionsIsoFiles = [];
-
-      // const myShellScript = exec("sh mapSharedDrive.sh ./");
-      // myShellScript.stdout.on("data", (data) => {
-      //   console.log(data);
-      //   optionsIsoFiles.push(data);
-      //   // do whatever you want here with data
-      // });
-      // myShellScript.stderr.on("data", (data) => {
-      //   console.error(data);
-      // });
       const myShellScript = exec("sh mapSharedDrive.sh ./");
       myShellScript.stdout.on("data", (data) => {
         console.log("success:" + data);
@@ -781,7 +770,7 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
             };
           });
 
-      let optionsIsoFile = getDirectories(source);
+      let optionsFactoryBlock = getDirectories(source);
 
       // // Define settings for readdirp
       // var settings = {
@@ -830,6 +819,45 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
       //           label: isoFilepath.basename,
       //         };
       //       });
+      res.status(200).json({
+        success: true,
+        message: "ISO file paths successfully fetched",
+        results: optionsFactoryBlock,
+        // results: optionsFactoryBlock,
+      });
+    });
+
+    // Fetch names of .iso files from given directory path
+    app.get("/getBmrIso", (req, res) => {
+      const path = require("path");
+      let source = "/mnt/nightFlyter";
+
+      const getIsoFiles = function (dirPath, arrayOfFiles) {
+        files = fs.readdirSync(dirPath);
+
+        arrayOfFiles = arrayOfFiles || [];
+
+        files.forEach(function (file) {
+          if (fs.statSync(dirPath + "/" + file).isDirectory()) {
+            arrayOfFiles = getAllFiles(dirPath + "/" + file, arrayOfFiles);
+          } else {
+            arrayOfFiles.push(path.join(__dirname, dirPath, "/", file));
+          }
+        });
+
+        return arrayOfFiles.map((file) => {
+          return {
+            value: file.name,
+            label: file.name,
+          };
+        });
+      };
+
+      // return {
+      //   value: dirent.name,
+      //   label: dirent.name,
+
+      let optionsIsoFile = getIsoFiles(source);
       res.status(200).json({
         success: true,
         message: "ISO file paths successfully fetched",
