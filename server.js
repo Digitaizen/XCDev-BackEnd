@@ -26,10 +26,11 @@ const cors = require("cors");
 const morganBody = require("morgan-body");
 const { exec } = require("child_process");
 const iDracSled = require("./ipmi-sled");
-// const readdirp = require("readdirp");
+const readdirp = require("readdirp");
 const Shell = require("node-powershell");
 const { get } = require("http");
 const { readdirSync, statSync } = require("fs");
+let path = require("path");
 
 // Declare the globals ////////////////////////////////////////////////////////
 const dbUrl = "mongodb://localhost:27017";
@@ -749,6 +750,7 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
 
     // Fetch names of all the folders listed for Factory Block on the XC Night Flyer Share
     // app.get("/getIsoFiles", (req, res) => {
+    let source = "";
     app.get("/getFactoryBlock", (req, res) => {
       const myShellScript = exec("sh mapSharedDrive.sh ./");
       myShellScript.stdout.on("data", (data) => {
@@ -758,7 +760,7 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
         console.error(data);
       });
 
-      let source = "/mnt/nightFlyter";
+      source = "/mnt/nightFlyter";
 
       const getDirectories = (source) =>
         readdirSync(source, { withFileTypes: true })
@@ -821,7 +823,7 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
       //       });
       res.status(200).json({
         success: true,
-        message: "ISO file paths successfully fetched",
+        message: "Factory Blocks successfully fetched",
         results: optionsFactoryBlock,
         // results: optionsFactoryBlock,
       });
@@ -829,7 +831,6 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
 
     // Fetch names of .iso files from given directory path
     app.get("/getBmrIso", (req, res) => {
-      // const path = require("path");
       const myShellScript = exec("sh mapSharedDrive.sh ./");
       myShellScript.stdout.on("data", (data) => {
         console.log("success:" + data);
@@ -838,69 +839,117 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
         console.error(data);
       });
 
-      let path = "/mnt/nightFlyter";
+      // let source = "/mnt/nightFlyter";
 
-      // Define settings for readdirp
-      var settings = {
-        // Only search for files with '.iso' extension
-        fileFilter: "*.iso",
-      };
+      // const getDirectories = (source) =>
+      //   readdirSync(source, { withFileTypes: true })
+      //     .filter((dirent) => console.log(dirent))
+      //     .map((dirent) => {
+      //       return {
+      //         value: dirent.name,
+      //         label: dirent.name,
+      //       };
+      //     });
 
-      // Declare array to hold .iso filenames
-      var isoFilePaths = [];
+      // let optionsIsoFile = getDirectories(source);
 
-      // Declare success and message variables for response
-      let successValue = null;
-      let messageValue = null;
+      // res.status(200).json({
+      //   success: true,
+      //   message: "ISO file paths successfully fetched",
+      //   results: optionsIsoFile,
+      //   // results: optionsFactoryBlock,
+      // });
 
-      // Iterate recursively through given path
-      readdirp(path, settings)
-        .on("data", function (entry) {
-          // Push .iso filename to array
-          isoFilePaths.push(entry);
-        })
-        .on("warn", function (warn) {
-          // Set success to false and message to warning
-          console.log("Warning: ", warn);
-          successValue = false;
-          messageValue = warn;
-        })
-        .on("error", function (err) {
-          // Set success to false and message to error
-          console.log("Error: ", err);
-          successValue = false;
-          messageValue = err;
-        })
-        .on("end", function (err) {
-          // If success is false, send warning/error response
-          if (successValue == false) {
-            res.status(500).json({
-              success: false,
-              message: messageValue,
-            });
-            // Else, send response with array of .iso filenames
-          } else {
-            var optionsIsoFile = isoFilePaths.map((isoFilepath) => {
-              return {
-                value: isoFilepath.basename,
-                label: isoFilepath.basename,
-              };
-            });
+      // const path = require("path");
+      // const myShellScript = exec("sh mapSharedDrive.sh ./");
+      // myShellScript.stdout.on("data", (data) => {
+      //   console.log("success:" + data);
+      // });
+      // myShellScript.stderr.on("data", (data) => {
+      //   console.error(data);
+      // });
+
+      // let path = "/mnt/nightFlyter";
+
+      // // Define settings for readdirp
+      // var settings = {
+      //   // Only search for files with '.iso' extension
+      //   fileFilter: "*.iso",
+      // };
+
+      // // Declare array to hold .iso filenames
+      // var isoFilePaths = [];
+
+      // // Declare success and message variables for response
+      // let successValue = null;
+      // let messageValue = null;
+
+      // // Iterate recursively through given path
+      // readdirp(path, settings)
+      //   .on("data", function (entry) {
+      //     // Push .iso filename to array
+      //     isoFilePaths.push(entry);
+      //   })
+      //   .on("warn", function (warn) {
+      //     // Set success to false and message to warning
+      //     console.log("Warning: ", warn);
+      //     successValue = false;
+      //     messageValue = warn;
+      //   })
+      //   .on("error", function (err) {
+      //     // Set success to false and message to error
+      //     console.log("Error: ", err);
+      //     successValue = false;
+      //     messageValue = err;
+      //   })
+      //   .on("end", function (err) {
+      //     // If success is false, send warning/error response
+      //     if (successValue == false) {
+      //       res.status(500).json({
+      //         success: false,
+      //         message: messageValue,
+      //       });
+      //       // Else, send response with array of .iso filenames
+      //     } else {
+      //       var optionsIsoFile = isoFilePaths.map((isoFilepath) => {
+      //         return {
+      //           value: isoFilepath.basename,
+      //           label: isoFilepath.basename,
+      //         };
+      //       });
+      //     }
+
+      const getIsoFiles = function (dirPath) {
+        let files = readdirSync(dirPath);
+        let arrayOfFiles = [];
+        files.map((name) => {
+          let extension = name.endsWith("iso");
+          if (extension === true) {
+            arrayOfFiles.push(name);
+            // console.log(name);
+            // return {
+            //   value: name,
+            //   label: name,
+            // };
           }
         });
+        return arrayOfFiles.map((fileName) => {
+          return {
+            value: fileName,
+            label: fileName,
+          };
+        });
+      };
 
-      // const getIsoFiles = function (dirPath, arrayOfFiles) {
-      //   let files = readdirSync(dirPath);
+      // let arrayOfFiles = arrayOfFiles || [];
 
-      //   let arrayOfFiles = arrayOfFiles || [];
-
-      //   files.forEach(function (file) {
-      //     if (statSync(dirPath + "/" + file).isDirectory()) {
-      //       arrayOfFiles = getAllFiles(dirPath + "/" + file, arrayOfFiles);
-      //     } else {
-      //       arrayOfFiles.push(path.join(__dirname, dirPath, "/", file));
-      //     }
-      //   });
+      // files.forEach(function (file) {
+      //   if (statSync(dirPath + "/" + file).isDirectory()) {
+      //     arrayOfFiles = getAllFiles(dirPath + "/" + file, arrayOfFiles);
+      //   } else {
+      //     arrayOfFiles.push(path.join(__dirname, dirPath, "/", file));
+      //   }
+      // });
 
       //   return arrayOfFiles.map((file) => {
       //     return {
@@ -909,18 +958,19 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
       //     };
       //   });
       // };
+      console.log(source);
+      let optionsIsoFile = getIsoFiles(source);
+      console.log(optionsIsoFile);
 
-      // return {
-      //   value: dirent.name,
-      //   label: dirent.name,
-
-      // let optionsIsoFile = getIsoFiles(source);
       res.status(200).json({
         success: true,
         message: "ISO file paths successfully fetched",
         results: optionsIsoFile,
-        // results: optionsFactoryBlock,
       });
+
+      // return {
+      //   value: dirent.name,
+      //   label: dirent.name,
     });
 
     // Reset password of user with specified password-reset token
