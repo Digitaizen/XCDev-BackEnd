@@ -750,7 +750,7 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
 
     // Fetch names of all the folders listed for Factory Block on the XC Night Flyer Share
     // app.get("/getIsoFiles", (req, res) => {
-    let source = "";
+
     app.get("/getFactoryBlock", (req, res) => {
       const myShellScript = exec("sh mapSharedDrive.sh ./");
       myShellScript.stdout.on("data", (data) => {
@@ -831,13 +831,15 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
 
     // Fetch names of .iso files from given directory path
     app.get("/getBmrIso", (req, res) => {
-      const myShellScript = exec("sh mapSharedDrive.sh ./");
+      const myShellScript = exec("sh mapSharedDriveBMRISO.sh ./");
       myShellScript.stdout.on("data", (data) => {
         console.log("success:" + data);
       });
       myShellScript.stderr.on("data", (data) => {
         console.error(data);
       });
+
+      let source = "/mnt/nightFlyterBMRISO/";
 
       const getIsoFiles = function (dirPath) {
         let files = readdirSync(dirPath);
