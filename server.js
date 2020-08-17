@@ -748,7 +748,8 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
     });
 
     // Fetch names of .iso files from given directory path
-    app.get("/getIsoFiles", (req, res) => {
+    // app.get("/getIsoFiles", (req, res) => {
+    app.get("/getFactoryBlock", (req, res) => {
       // let optionsIsoFiles = [];
 
       // const myShellScript = exec("sh mapSharedDrive.sh ./");
