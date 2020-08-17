@@ -840,7 +840,7 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
 
       let path = "/mnt/nightFlyter";
 
-       // Define settings for readdirp
+      // Define settings for readdirp
       var settings = {
         // Only search for files with '.iso' extension
         fileFilter: "*.iso",
@@ -886,6 +886,8 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
                 label: isoFilepath.basename,
               };
             });
+          }
+        });
 
       // const getIsoFiles = function (dirPath, arrayOfFiles) {
       //   let files = readdirSync(dirPath);
