@@ -750,17 +750,17 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
 
     // Fetch names of all the folders listed for Factory Block on the XC Night Flyer Share
     // app.get("/getIsoFiles", (req, res) => {
-
+    // let source = "";
     app.get("/getFactoryBlock", (req, res) => {
-      const myShellScript = exec("sh mapSharedDrive.sh ./");
-      myShellScript.stdout.on("data", (data) => {
-        console.log("success:" + data);
-      });
-      myShellScript.stderr.on("data", (data) => {
-        console.error(data);
-      });
+      // const myShellScript = exec("sh mapSharedDrive.sh ./");
+      // myShellScript.stdout.on("data", (data) => {
+      //   console.log("success:" + data);
+      // });
+      // myShellScript.stderr.on("data", (data) => {
+      //   console.error(data);
+      // });
 
-      source = "/mnt/nightFlyter";
+      let source = "/mnt/nightFlyter";
 
       const getDirectories = (source) =>
         readdirSync(source, { withFileTypes: true })
@@ -831,16 +831,14 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
 
     // Fetch names of .iso files from given directory path
     app.get("/getBmrIso", (req, res) => {
-      const myShellScript = exec("sh mapSharedDriveBMRISO.sh ./");
-      myShellScript.stdout.on("data", (data) => {
-        console.log("success:" + data);
-      });
-      myShellScript.stderr.on("data", (data) => {
-        console.error(data);
-      });
-
-      let source = "/mnt/nightFlyterBMRISO/";
-
+      // const myShellScript = exec("sh mapSharedDriveBMRISO.sh ./");
+      // myShellScript.stdout.on("data", (data) => {
+      //   console.log("success:" + data);
+      // });
+      // myShellScript.stderr.on("data", (data) => {
+      //   console.error(data);
+      // });
+      let source = "/mnt/nightFlyter";
       const getIsoFiles = function (dirPath) {
         let files = readdirSync(dirPath);
         let arrayOfFiles = [];
@@ -858,9 +856,8 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
         });
       };
 
-      console.log(source);
+      console.log("SOURCE IS: " + source);
       let optionsIsoFile = getIsoFiles(source);
-      console.log(optionsIsoFile);
 
       res.status(200).json({
         success: true,
