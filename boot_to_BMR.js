@@ -6,6 +6,7 @@ const https = require("https");
 const base64 = require("base-64");
 const fetch = require("node-fetch");
 const { resolve } = require('path');
+const { response } = require('express');
 
 // Declare variables >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 const idrac_username = "root";
@@ -206,6 +207,8 @@ function resetSystemForceRestart(node_ip) {
     })
 }
 
+
+// WIP..
 function mountImageViaRacadm(imgPath) {
     try {
         // console.log(`Mounting the image via RACADM`);
@@ -444,10 +447,11 @@ function checkVirtualMediaCdStatus(node_ip) {
 }
 
 
-// WIP. Call this function with an array of IPs and image props to mount ISO image from a share on them. If any of the
+// WIP. Call this function with an array of IPs and image props to mount ISO image from a share. If any of the
 // functions fail, it will as well. 
 function mountNetworkImageOnNodes(idrac_ips, share_ip, share_type, share_name, image_name, user_name, user_pass) {
     return new Promise((resolve, reject) => {
+        console.log("mountNetworkImageOnNodes function called for ", idrac_ips);   //debugging
         let mountedCounter = 0;
 
         idrac_ips.forEach(idrac_ip => {
@@ -469,7 +473,7 @@ function mountNetworkImageOnNodes(idrac_ips, share_ip, share_type, share_name, i
                                                         if (response.success) {
                                                             mountedCounter++;
                                                             if (mountedCounter == idrac_ips.length) {
-                                                                resolve({ success: true, message: response.message })
+                                                                resolve({ success: true, message: `${image_name} has been successfuly mounted on all selected nodes.` })
                                                             }
                                                         } else {
                                                             reject({ success: false, message: response.message });
@@ -487,7 +491,7 @@ function mountNetworkImageOnNodes(idrac_ips, share_ip, share_type, share_name, i
                                             if (response.success) {
                                                 mountedCounter++;
                                                 if (mountedCounter == idrac_ips.length) {
-                                                    resolve({ success: true, message: response.message })
+                                                    resolve({ success: true, message: `${image_name} has been successfuly mounted on all selected nodes.` })
                                                 }
                                             } else {
                                                 reject({ success: false, message: response.message });
@@ -512,6 +516,31 @@ function mountNetworkImageOnNodes(idrac_ips, share_ip, share_type, share_name, i
     })
 }
 
+// Call it with an array of iDRAC IPs you want to reboot. Stops and returns failure flag if any of them fails to reboot.
+function rebootSelectedNodes(idrac_ips) {
+    return new Promise((resolve, reject) => {
+        console.log("rebootSelectedNodes function called for ", idrac_ips);   //debugging
+        let rebootCounter = 0;
+
+        idrac_ips.forEach(idrac_ip => {
+            resetSystemForceRestart(idrac_ip)
+                .then(response => {
+                    console.log(`resetSystemForceRestart result: ${response.message}`);
+                    if (response.success) {
+                        rebootCounter++;
+                        if (rebootCounter == idrac_ips.length)
+                            resolve({ success: true, message: `All selected nodes have been successfuly rebooted.` });
+                    }
+                    else
+                        reject({ success: false, message: response.message })
+                })
+                .catch(error => {
+                    console.log(`FAIL: resetSystemForceRestart for ${idrac_ip} failed: ${error.message}`);
+                    reject({ success: false, message: `FAIL: resetSystemForceRestart for ${idrac_ip} failed: ${error.message}` });
+                });
+        })
+    })
+}
 
 // Run main/test module's functions >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 // Array with two iDRAC IPs, one w/new fw w/support for RF and another without
@@ -523,6 +552,28 @@ function mountNetworkImageOnNodes(idrac_ips, share_ip, share_type, share_name, i
 // let image_name = "BMR_DELL_120319.iso";
 // let user_name = "nutanix_admin";
 // let user_pass = "raid4us!";
+
+// // Example of calling mountNetworkImageOnNodes then rebootSelectedNodes functions from server.js
+// mountNetworkImageOnNodes(ip_arr, share_ip, share_type, share_name, image_name, user_name, user_pass)
+//     .then(response => {
+//         if (response.success) {
+//             // Logic in case of success
+//             console.log(response.message);
+//             // Reboot systems
+//             rebootSelectedNodes(ip_arr)
+//                 .then(response => {
+//                     if (response.success)
+//                         // Logic in case of success
+//                         console.log(response.message);
+//                     else
+//                         // Logic in case of failure
+//                         console.log(response.message);
+//                 })
+//         }
+//         else
+//             // Logic in case of failure
+//             console.log(response.message);
+//     });
 
 // ip_arr.forEach(idrac_ip => {
 //     checkRedfishSupport(idrac_ip)
