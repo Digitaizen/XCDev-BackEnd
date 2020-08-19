@@ -24,7 +24,7 @@ const async = require("async");
 const crypto = require("crypto");
 const cors = require("cors");
 const morganBody = require("morgan-body");
-const { exec } = require("child_process");
+const { exec, execFile } = require("child_process");
 const iDracSled = require("./ipmi-sled");
 const readdirp = require("readdirp");
 const Shell = require("node-powershell");
@@ -867,23 +867,35 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
     });
 
     app.post("/bmrFactoryImaging", (req, res) => {
-      console.log(req.body);
+      // console.log(req.body);
 
       let ip_arr = req.body.selectedRowData.map((server) => {
         return server.ip;
       });
-      // let share_ip = "";
-      // let share_type = "CIFS";
+      console.log(`IPADDRESS ARRAY HERE ${ip_arr}`);
       let share_name = "/mnt/bmr";
       let image_name = req.body.selectedBmrIsoOption;
       let block_name = req.body.selectedFactoryBlockOption;
       let hypervisor_name = req.body.selectedHypervisorOption;
-      // let user_name = "nutanix_admin";
-      // let user_pass = "raid4us!";
-      console.log(ip_arr);
-      console.log("Image name: " + image_name);
-      console.log("Block name: " + block_name);
-      console.log("Hypervisor name: " + hypervisor_name);
+
+      // Invoke Bash Script to add entries to iDRAC's LCLOG file
+      for (const ipAddress of ip_arr) {
+        console.log("BMR SHELL SCRIPT LOOP HERE");
+        const myShellScript = execFile("./bmr-parm.sh", [
+          ipAddress,
+          block_name,
+          hypervisor_name,
+          share_name,
+        ]);
+
+        myShellScript.stdout.on("data", (data) => {
+          console.log("success:" + data);
+        });
+
+        myShellScript.stderr.on("data", (data) => {
+          console.error(data);
+        });
+      }
     });
 
     // Reset password of user with specified password-reset token
