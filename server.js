@@ -31,6 +31,7 @@ const Shell = require("node-powershell");
 const { get } = require("http");
 const { readdirSync, statSync } = require("fs");
 let path = require("path");
+let rebootSelectedNodes = require("./boot_to_BMR");
 
 // Declare the globals ////////////////////////////////////////////////////////
 const dbUrl = "mongodb://localhost:27017";
@@ -872,26 +873,24 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
       let ip_arr = req.body.selectedRowData.map((server) => {
         return server.ip;
       });
-      console.log(`IPADDRESS ARRAY HERE ${ip_arr}`);
+
       let share_name = "/mnt/bmr";
       let image_name = req.body.selectedBmrIsoOption;
       let block_name = req.body.selectedFactoryBlockOption;
       let hypervisor_name = req.body.selectedHypervisorOption;
 
+      // Mount BMR ISO
+
       // Invoke Bash Script to add entries to iDRAC's LCLOG file
       for (const ipAddress of ip_arr) {
         console.log("BMR SHELL SCRIPT LOOP HERE");
-        const myShellScript = execFile("./bmr-parm.sh", [
-          ipAddress,
-          block_name,
-          hypervisor_name,
-          share_name,
-        ]);
 
+        const myShellScript = exec(
+          `sh bmr-parm.sh ${ipAddress} ${block_name} ${hypervisor_name} ${share_name} ./`
+        );
         myShellScript.stdout.on("data", (data) => {
-          console.log("success:" + data);
+          console.log(`success ${data}`);
         });
-
         myShellScript.stderr.on("data", (data) => {
           console.error(data);
         });
