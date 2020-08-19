@@ -760,7 +760,7 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
       //   console.error(data);
       // });
 
-      let source = "/mnt/nightFlyter";
+      let source = "/mnt/bmr";
 
       const getDirectories = (source) =>
         readdirSync(source, { withFileTypes: true })
@@ -838,12 +838,12 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
       // myShellScript.stderr.on("data", (data) => {
       //   console.error(data);
       // });
-      let source = "/mnt/nightFlyter";
+      let source = "/mnt/bmr";
       const getIsoFiles = function (dirPath) {
         let files = readdirSync(dirPath);
         let arrayOfFiles = [];
         files.map((name) => {
-          let extension = name.endsWith("iso");
+          let extension = name.endsWith("iso") && name.includes("BMR3");
           if (extension === true) {
             arrayOfFiles.push(name);
           }
@@ -864,6 +864,26 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
         message: "ISO file paths successfully fetched",
         results: optionsIsoFile,
       });
+    });
+
+    app.post("/bmrFactoryImaging", (req, res) => {
+      console.log(req.body);
+
+      let ip_arr = req.body.selectedRowData.map((server) => {
+        return server.ip;
+      });
+      // let share_ip = "";
+      // let share_type = "CIFS";
+      let share_name = "/mnt/bmr";
+      let image_name = req.body.selectedBmrIsoOption;
+      let block_name = req.body.selectedFactoryBlockOption;
+      let hypervisor_name = req.body.selectedHypervisorOption;
+      // let user_name = "nutanix_admin";
+      // let user_pass = "raid4us!";
+      console.log(ip_arr);
+      console.log("Image name: " + image_name);
+      console.log("Block name: " + block_name);
+      console.log("Hypervisor name: " + hypervisor_name);
     });
 
     // Reset password of user with specified password-reset token
