@@ -31,7 +31,7 @@ const Shell = require("node-powershell");
 const { get } = require("http");
 const { readdirSync, statSync } = require("fs");
 let path = require("path");
-let rebootSelectedNodes = require("./boot_to_BMR");
+const bmrIsoProcess = require("./boot_to_BMR");
 
 // Declare the globals ////////////////////////////////////////////////////////
 const dbUrl = "mongodb://localhost:27017";
@@ -775,53 +775,6 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
 
       let optionsFactoryBlock = getDirectories(source);
 
-      // // Define settings for readdirp
-      // var settings = {
-      //   // Only search for files with '.iso' extension
-      //   fileFilter: "*.iso",
-      // };
-
-      // // Declare array to hold .iso filenames
-      // var isoFilePaths = [];
-
-      // // Declare success and message variables for response
-      // let successValue = null;
-      // let messageValue = null;
-
-      // Iterate recursively through given path
-      // readdirp(req.body.path, settings)
-      // readdirp(path, settings)
-      //   .on("data", function (entry) {
-      //     // Push .iso filename to array
-      //     isoFilePaths.push(entry);
-      //   })
-      //   .on("warn", function (warn) {
-      //     // Set success to false and message to warning
-      //     console.log("Warning: ", warn);
-      //     successValue = false;
-      //     messageValue = warn;
-      //   })
-      //   .on("error", function (err) {
-      //     // Set success to false and message to error
-      //     console.log("Error: ", err);
-      //     successValue = false;
-      //     messageValue = err;
-      //   })
-      //   .on("end", function (err) {
-      //     // If success is false, send warning/error response
-      //     if (successValue == false) {
-      //       res.status(500).json({
-      //         success: false,
-      //         message: messageValue,
-      //       });
-      //       // Else, send response with array of .iso filenames
-      //     } else {
-      //       var optionsIsoFile = isoFilePaths.map((isoFilepath) => {
-      //         return {
-      //           value: isoFilepath.basename,
-      //           label: isoFilepath.basename,
-      //         };
-      //       });
       res.status(200).json({
         success: true,
         message: "Factory Blocks successfully fetched",
@@ -832,13 +785,6 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
 
     // Fetch names of .iso files from given directory path
     app.get("/getBmrIso", (req, res) => {
-      // const myShellScript = exec("sh mapSharedDriveBMRISO.sh ./");
-      // myShellScript.stdout.on("data", (data) => {
-      //   console.log("success:" + data);
-      // });
-      // myShellScript.stderr.on("data", (data) => {
-      //   console.error(data);
-      // });
       let source = "/mnt/bmr";
       const getIsoFiles = function (dirPath) {
         let files = readdirSync(dirPath);
@@ -867,6 +813,7 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
       });
     });
 
+    // Getting data from Front-END and passing it to the BMR Process Scripts
     app.post("/bmrFactoryImaging", (req, res) => {
       // console.log(req.body);
 
@@ -880,7 +827,17 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
       let hypervisor_name = req.body.selectedHypervisorOption;
 
       // Mount BMR ISO
+      // AZAT SCRIPTS START
+      if (ip_arr !== "" && share_name !== "" && image_name !== "") {
+        bmrIsoProcess
+          .mountNetworkImageOnNodes(ip_arr, share_name, image_name)
+          .then((response) => console.log(response.message));
+      }
 
+      // CHECK SUCCESS FROM RESPONSE
+
+      // ID RESPONSE = SUCCESS
+      // THEN START AHMAD SCRIPT
       // Invoke Bash Script to add entries to iDRAC's LCLOG file
       for (const ipAddress of ip_arr) {
         console.log("BMR SHELL SCRIPT LOOP HERE");

@@ -45,8 +45,8 @@ then
     exit 1
 fi
 # power off/on the target system
-# x0=`racadm -r "$BMCIP" -u root -p calvin serveraction powerdown`
-# x0=`racadm -r "$BMCIP" -u root -p calvin serveraction powerup`
+x0=`racadm -r "$BMCIP" -u root -p calvin serveraction powerdown`
+x0=`racadm -r "$BMCIP" -u root -p calvin serveraction powerup`
 
 #return the worknote entry for followup
 # echo $SeqNum
