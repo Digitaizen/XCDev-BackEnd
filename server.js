@@ -24,13 +24,14 @@ const async = require("async");
 const crypto = require("crypto");
 const cors = require("cors");
 const morganBody = require("morgan-body");
-const { exec } = require("child_process");
+const { exec, execFile } = require("child_process");
 const iDracSled = require("./ipmi-sled");
 const readdirp = require("readdirp");
 const Shell = require("node-powershell");
 const { get } = require("http");
 const { readdirSync, statSync } = require("fs");
 let path = require("path");
+const bmrIsoProcess = require("./boot_to_BMR");
 
 // Declare the globals ////////////////////////////////////////////////////////
 const dbUrl = "mongodb://localhost:27017";
@@ -774,53 +775,6 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
 
       let optionsFactoryBlock = getDirectories(source);
 
-      // // Define settings for readdirp
-      // var settings = {
-      //   // Only search for files with '.iso' extension
-      //   fileFilter: "*.iso",
-      // };
-
-      // // Declare array to hold .iso filenames
-      // var isoFilePaths = [];
-
-      // // Declare success and message variables for response
-      // let successValue = null;
-      // let messageValue = null;
-
-      // Iterate recursively through given path
-      // readdirp(req.body.path, settings)
-      // readdirp(path, settings)
-      //   .on("data", function (entry) {
-      //     // Push .iso filename to array
-      //     isoFilePaths.push(entry);
-      //   })
-      //   .on("warn", function (warn) {
-      //     // Set success to false and message to warning
-      //     console.log("Warning: ", warn);
-      //     successValue = false;
-      //     messageValue = warn;
-      //   })
-      //   .on("error", function (err) {
-      //     // Set success to false and message to error
-      //     console.log("Error: ", err);
-      //     successValue = false;
-      //     messageValue = err;
-      //   })
-      //   .on("end", function (err) {
-      //     // If success is false, send warning/error response
-      //     if (successValue == false) {
-      //       res.status(500).json({
-      //         success: false,
-      //         message: messageValue,
-      //       });
-      //       // Else, send response with array of .iso filenames
-      //     } else {
-      //       var optionsIsoFile = isoFilePaths.map((isoFilepath) => {
-      //         return {
-      //           value: isoFilepath.basename,
-      //           label: isoFilepath.basename,
-      //         };
-      //       });
       res.status(200).json({
         success: true,
         message: "Factory Blocks successfully fetched",
@@ -831,13 +785,6 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
 
     // Fetch names of .iso files from given directory path
     app.get("/getBmrIso", (req, res) => {
-      // const myShellScript = exec("sh mapSharedDriveBMRISO.sh ./");
-      // myShellScript.stdout.on("data", (data) => {
-      //   console.log("success:" + data);
-      // });
-      // myShellScript.stderr.on("data", (data) => {
-      //   console.error(data);
-      // });
       let source = "/mnt/bmr";
       const getIsoFiles = function (dirPath) {
         let files = readdirSync(dirPath);
@@ -866,24 +813,107 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
       });
     });
 
+    // Getting data from Front-END and passing it to the BMR Process Scripts
     app.post("/bmrFactoryImaging", (req, res) => {
-      console.log(req.body);
+      // console.log(req.body);
 
+      // Define bmr payload values for mounting network image
       let ip_arr = req.body.selectedRowData.map((server) => {
         return server.ip;
       });
-      // let share_ip = "";
-      // let share_type = "CIFS";
-      let share_name = "/mnt/bmr";
       let image_name = req.body.selectedBmrIsoOption;
       let block_name = req.body.selectedFactoryBlockOption;
       let hypervisor_name = req.body.selectedHypervisorOption;
-      // let user_name = "nutanix_admin";
-      // let user_pass = "raid4us!";
-      console.log(ip_arr);
-      console.log("Image name: " + image_name);
-      console.log("Block name: " + block_name);
-      console.log("Hypervisor name: " + hypervisor_name);
+
+      let bmr_payload_values = fs
+        .readFileSync("bmr_payload_values.txt")
+        .toString()
+        .replace(/\r/g, "")
+        .split("\n");
+      let share_ip = bmr_payload_values[0];
+      let share_name = bmr_payload_values[1];
+      let share_type = bmr_payload_values[2];
+      let bmr_username = bmr_payload_values[3];
+      let bmr_password = bmr_payload_values[4];
+
+      // console.log(bmr_payload_values);
+
+      // Define values to add to iDRAC LCLOG files
+      // let share_name = "/mnt/bmr";
+
+      // Mount BMR ISO
+      // AZAT SCRIPTS START
+      if (
+        ip_arr !== "" &&
+        share_ip !== "" &&
+        share_name !== "" &&
+        share_type !== "" &&
+        image_name !== "" &&
+        bmr_username !== "" &&
+        bmr_password !== ""
+      ) {
+        bmrIsoProcess
+          .mountNetworkImageOnNodes(
+            ip_arr,
+            share_ip,
+            share_type,
+            share_name,
+            image_name,
+            bmr_username,
+            bmr_password
+          )
+          .then((response) => {
+            console.log(response.message);
+            if (response.success) {
+              // Invoke Bash Script to add entries to iDRAC's LCLOG file
+              for (const ipAddress of ip_arr) {
+                console.log("BMR SHELL SCRIPT LOOP HERE");
+
+                const myShellScript = exec(
+                  `sh bmr-parm.sh ${ipAddress} ${block_name} ${hypervisor_name} ${share_name} ${bmr_username} ${bmr_password}`
+                );
+                myShellScript.stdout.on("data", (data) => {
+                  console.log(`success ${data}`);
+                  // res.status(200).json({
+                  //   success: true,
+                  //   message:
+                  //     "Successfully completed BMR factory imaging process",
+                  // });
+                });
+                myShellScript.stderr.on("data", (data) => {
+                  console.error(data);
+                  // res.status(500).json({
+                  //   success: false,
+                  //   message: data,
+                  // });
+                });
+              }
+            } else {
+              // res
+              //   .status(500)
+              //   .json({ success: false, message: response.message });
+            }
+          });
+      }
+
+      // CHECK SUCCESS FROM RESPONSE
+
+      // ID RESPONSE = SUCCESS
+      // THEN START AHMAD SCRIPT
+      // Invoke Bash Script to add entries to iDRAC's LCLOG file
+      // for (const ipAddress of ip_arr) {
+      //   console.log("BMR SHELL SCRIPT LOOP HERE");
+
+      //   const myShellScript = exec(
+      //     `sh bmr-parm.sh ${ipAddress} ${block_name} ${hypervisor_name} ${share_name} ./`
+      //   );
+      //   myShellScript.stdout.on("data", (data) => {
+      //     console.log(`success ${data}`);
+      //   });
+      //   myShellScript.stderr.on("data", (data) => {
+      //     console.error(data);
+      //   });
+      // }
     });
 
     // Reset password of user with specified password-reset token
