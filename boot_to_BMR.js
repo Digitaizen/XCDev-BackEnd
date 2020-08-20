@@ -102,12 +102,12 @@ function checkAttachStatus(node_ip) {
 
 function connectNetworkIsoImage(
   node_ip,
-  // share_ip,
-  // share_type,
+  share_ip,
+  share_type,
   share_name,
-  image_name
-  // user_name,
-  // user_pass
+  image_name,
+  user_name,
+  user_pass
 ) {
   return new Promise((resolve, reject) => {
     console.log("connectNetworkIsoImage function called for ", node_ip); //debugging
@@ -121,12 +121,12 @@ function connectNetworkIsoImage(
     });
 
     const payload = {
-      // IPAddress: share_ip,
+      IPAddress: share_ip,
       ShareName: share_name,
-      // ShareType: share_type,
+      ShareType: share_type,
       ImageName: image_name,
-      // UserName: user_name,
-      // Password: user_pass,
+      UserName: user_name,
+      Password: user_pass,
     };
 
     let options = {
@@ -543,12 +543,12 @@ function checkVirtualMediaCdStatus(node_ip) {
 // functions fail, it will as well.
 function mountNetworkImageOnNodes(
   idrac_ips,
-  // share_ip,
-  // share_type,
+  share_ip,
+  share_type,
   share_name,
-  image_name
-  // user_name,
-  // user_pass
+  image_name,
+  user_name,
+  user_pass
 ) {
   return new Promise((resolve, reject) => {
     console.log("mountNetworkImageOnNodes function called for ", idrac_ips); //debugging
@@ -570,12 +570,12 @@ function mountNetworkImageOnNodes(
                     if (response.success) {
                       connectNetworkIsoImage(
                         idrac_ip,
-                        // share_ip,
-                        // share_type,
+                        share_ip,
+                        share_type,
                         share_name,
-                        image_name
-                        // user_name,
-                        // user_pass
+                        image_name,
+                        user_name,
+                        user_pass
                       ).then((response) => {
                         console.log(
                           `connectNetworkIsoImage result: ${response.message}`
@@ -599,12 +599,12 @@ function mountNetworkImageOnNodes(
                 } else {
                   connectNetworkIsoImage(
                     idrac_ip,
-                    // share_ip,
-                    // share_type,
+                    share_ip,
+                    share_type,
                     share_name,
-                    image_name
-                    // user_name,
-                    // user_pass
+                    image_name,
+                    user_name,
+                    user_pass
                   ).then((response) => {
                     console.log(
                       `connectNetworkIsoImage result: ${response.message}`

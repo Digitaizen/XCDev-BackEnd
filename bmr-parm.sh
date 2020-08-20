@@ -12,7 +12,6 @@ TgtShareUser=$5
 TgtSharePswd=$6
 # Use default values for XC ADC lab if following not passed
 # [ -z "$4" ] && TgtShare="//10.211.4.215/dropbox/dl/wims/xc"
-[ -z "$4" ] && TgtShare="/mnt/bmr"
 # [ -z "$5" ] && TgtShareUser="nutanix_admin"
 # [ -z "$6" ] && TgtSharePswd="raid4us!"
 
@@ -31,7 +30,7 @@ then
 fi
 
 # add a comment in entry SeqNum for BMR parms
-x0=`racadm -r $BMCIP -u root -p calvin lclog comment edit -q $SeqNum -m "$TgtShare $TgtBlock $TgtOS"`
+x0=`racadm -r $BMCIP -u root -p calvin lclog comment edit -q $SeqNum -m "$TgtShare  $TgtShareUser $TgtSharePswd $TgtBlock $TgtOS"`
 # x1=`racadm -r $BMCIP -u root -p calvin lclog view -c worknotes -k xcwebapp|grep UserComment`
 x1=`racadm -r "$BMCIP" -u root -p calvin lclog view -q $SeqNum -n 1|grep UserComment|tr -d '\r' `
 x2=( $x1 )
@@ -49,6 +48,6 @@ x0=`racadm -r "$BMCIP" -u root -p calvin serveraction powerdown`
 x0=`racadm -r "$BMCIP" -u root -p calvin serveraction powerup`
 
 #return the worknote entry for followup
-# echo $SeqNum
-# exit 0
+echo $SeqNum
+exit 0
 
