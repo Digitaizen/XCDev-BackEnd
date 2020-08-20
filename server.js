@@ -20,12 +20,18 @@ const keys = require("./config/keys");
 const Validator = require("validator");
 const isEmpty = require("is-empty");
 const async = require("async");
-const nodemailer = require("nodemailer");
+// const nodemailer = require("nodemailer");
 const crypto = require("crypto");
 const cors = require("cors");
 const morganBody = require("morgan-body");
-const { exec } = require("child_process");
+const { exec, execFile } = require("child_process");
 const iDracSled = require("./ipmi-sled");
+const readdirp = require("readdirp");
+const Shell = require("node-powershell");
+const { get } = require("http");
+const { readdirSync, statSync } = require("fs");
+let path = require("path");
+const bmrIsoProcess = require("./boot_to_BMR");
 
 // Declare the globals ////////////////////////////////////////////////////////
 const dbUrl = "mongodb://localhost:27017";
@@ -40,8 +46,8 @@ const corsOptions = {
   origin: [
     "http://localhost:3000",
     "http://100.80.149.19",
-    "http://100.80.150.91"
-  ]
+    "http://100.80.150.91",
+  ],
 };
 
 // Define functions here //////////////////////////////////////////////////////
@@ -79,8 +85,8 @@ function scanSubnet() {
  */
 const fetch_retry = (url, options, n) =>
   fetch(url, options, {
-    method: "GET"
-  }).catch(error => {
+    method: "GET",
+  }).catch((error) => {
     if (n === 1) throw error;
     return fetch_retry(url, options, n - 1);
   });
@@ -94,12 +100,13 @@ async function getRedfishData(idracIps, db) {
   let serverCount = 0;
 
   // Iterate through iDRAC IPs
-  idracIps.forEach(item => {
+  idracIps.forEach((item) => {
     // Declare object that will store the iDRAC's data
     let redfishDataObject = {};
 
     // Define the URLs to be fetched from
     let v1Url = "https://" + item + "/redfish/v1";
+    let fwUrl = "https://" + item + "/redfish/v1/Managers/iDRAC.Embedded.1";
     let systemUrl = "https://" + item + "/redfish/v1/Systems/System.Embedded.1";
     let locationUrl =
       "https://" +
@@ -112,7 +119,7 @@ async function getRedfishData(idracIps, db) {
 
     // Construct options to be used in fetch call
     const agent = new https.Agent({
-      rejectUnauthorized: false
+      rejectUnauthorized: false,
     });
 
     let options = {
@@ -121,75 +128,94 @@ async function getRedfishData(idracIps, db) {
         "Content-Type": "application/json",
         Authorization: `Basic ${base64.encode(
           `${iDracLogin}:${iDracPassword}`
-        )}`
+        )}`,
       },
-      agent: agent
+      agent: agent,
     };
 
     // Make fetch call on v1 URL
     fetch_retry(v1Url, options, 3)
-      .then(response => {
+      .then((response) => {
         if (response.ok) {
           return response.json();
         } else {
           return Promise.reject(response);
         }
       })
-      .then(v1Data => {
+      .then((v1Data) => {
         // Store data from v1 URL in iDRAC data object
         redfishDataObject["v1"] = v1Data;
+
+        // Make fetch call on firmware URL
+        return fetch_retry(fwUrl, options, 3);
+      })
+      .then((response) => {
+        if (response.ok) {
+          return response.json();
+        } else {
+          return Promise.reject(response);
+        }
+      })
+      .then((fwData) => {
+        // Store data from fw URL in iDRAC data object
+        redfishDataObject["fw"] = fwData;
 
         // Make fetch call on systems URL
         return fetch_retry(systemUrl, options, 3);
       })
-      .then(response => {
+      .then((response) => {
         if (response.ok) {
           return response.json();
         } else {
           return Promise.reject(response);
         }
       })
-      .then(systemData => {
+      .then((systemData) => {
         // Store data from systems URL in iDRAC data object
         redfishDataObject["System"] = systemData;
 
-        // Check if iDRAC is 14G or higher
-        let systemGeneration = redfishDataObject.System.hasOwnProperty("Oem")
-          ? redfishDataObject.System.Oem.Dell.DellSystem.SystemGeneration
-          : "";
+        /**
+         * DELLXCDEV-113
+         *
+         * Location scanning logic commented out in lines 161-186, 206-211, 224-248, 258, 271, 282
+         */
+        //   // Check if iDRAC is 14G or higher
+        //   let systemGeneration = redfishDataObject.System.hasOwnProperty("Oem")
+        //     ? redfishDataObject.System.Oem.Dell.DellSystem.SystemGeneration
+        //     : "";
 
-        // If iDRAC generation was scanned and 14G or higher, run location scan
-        if (
-          systemGeneration != "" &&
-          parseInt(systemGeneration.substring(0, 2)) >= 14
-        ) {
-          return fetch_retry(locationUrl, options, 3);
-        } else {
-          // Else, return "no location data" JSON
-          return { data: "no location data fetched" };
-        }
-      })
-      .then(response => {
-        if (response.ok) {
-          return response.json();
-        } else {
-          return { error: "No location data available" };
-        }
-      })
-      .then(locationData => {
-        // Store data from location URL in iDRAC data object
-        redfishDataObject["Location"] = locationData;
+        //   // If iDRAC generation was scanned and 14G or higher, run location scan
+        //   if (
+        //     systemGeneration != "" &&
+        //     parseInt(systemGeneration.substring(0, 2)) >= 14
+        //   ) {
+        //     return fetch_retry(locationUrl, options, 3);
+        //   } else {
+        //     // Else, return "no location data" JSON
+        //     return { data: "no location data fetched" };
+        //   }
+        // })
+        // .then(response => {
+        //   if (response.ok) {
+        //     return response.json();
+        //   } else {
+        //     return { error: "No location data available" };
+        //   }
+        // })
+        // .then(locationData => {
+        //   // Store data from location URL in iDRAC data object
+        //   redfishDataObject["Location"] = locationData;
 
         return fetch_retry(codeNameUrl, options, 3);
       })
-      .then(response => {
+      .then((response) => {
         if (response.ok) {
           return response.json();
         } else {
           return { error: "No location data available" };
         }
       })
-      .then(codeNameData => {
+      .then((codeNameData) => {
         // Store data from codename URL in iDRAC data object
         redfishDataObject["codeName"] = codeNameData;
 
@@ -198,12 +224,12 @@ async function getRedfishData(idracIps, db) {
           ? redfishDataObject.System.Oem.Dell.DellSystem.SystemGeneration
           : "";
 
-        // If no location was scanned, set location variable to "--"
-        let serverLocation = redfishDataObject.Location.hasOwnProperty(
-          "Attributes"
-        )
-          ? `${redfishDataObject.Location.Attributes["ServerTopology.1.DataCenterName"]}-${redfishDataObject.Location.Attributes["ServerTopology.1.RackName"]}-${redfishDataObject.Location.Attributes["ServerTopology.1.RackSlot"]}`
-          : "--";
+        // // If no location was scanned, set location variable to "--"
+        // let serverLocation = redfishDataObject.Location.hasOwnProperty(
+        //   "Attributes"
+        // )
+        //   ? `${redfishDataObject.Location.Attributes["ServerTopology.1.DataCenterName"]}-${redfishDataObject.Location.Attributes["ServerTopology.1.RackName"]}-${redfishDataObject.Location.Attributes["ServerTopology.1.RackSlot"]}`
+        //   : "--";
 
         // Add or update collection entry with iDRAC data object
         return db
@@ -216,54 +242,55 @@ async function getRedfishData(idracIps, db) {
               }
               // If an entry with the same service tag is found, update the entry
               if (results !== null) {
-                // If no location data was scanned, don't update the location field
-                if (serverLocation == "--") {
-                  db.collection(dbColl_Servers).updateOne(
-                    { serviceTag: redfishDataObject.System.SKU },
-                    {
-                      $set: {
-                        ip: item,
-                        serviceTag: redfishDataObject.System.SKU,
-                        model: redfishDataObject.System.Model,
-                        hostname: redfishDataObject.System.HostName,
-                        generation: systemGeneration
-                      }
+                // // If no location data was scanned, don't update the location field
+                // if (serverLocation == "--") {
+                //   db.collection(dbColl_Servers).updateOne(
+                //     { serviceTag: redfishDataObject.System.SKU },
+                //     {
+                //       $set: {
+                //         ip: item,
+                //         serviceTag: redfishDataObject.System.SKU,
+                //         model: redfishDataObject.System.Model,
+                //         hostname: redfishDataObject.System.HostName,
+                //         generation: systemGeneration
+                //       }
+                //     },
+                //     err => {
+                //       if (err) {
+                //         return console.log(err);
+                //       }
+                //       serverCount++;
+                //       console.log(
+                //         `Server # ${serverCount} @ ${item} updated in db`
+                //       );
+                //     }
+                //   );
+                //   // If location data was scanned, include location field in update query
+                // } else {
+                db.collection(dbColl_Servers).updateOne(
+                  { serviceTag: redfishDataObject.System.SKU },
+                  {
+                    $set: {
+                      ip: item,
+                      serviceTag: redfishDataObject.System.SKU,
+                      firmwareVersion: redfishDataObject.fw.FirmwareVersion,
+                      model: redfishDataObject.System.Model,
+                      hostname: redfishDataObject.System.HostName,
+                      generation: systemGeneration,
+                      // location: serverLocation
                     },
-                    err => {
-                      if (err) {
-                        return console.log(err);
-                      }
-                      serverCount++;
-                      console.log(
-                        `Server # ${serverCount} @ ${item} updated in db`
-                      );
+                  },
+                  (err) => {
+                    if (err) {
+                      return console.log(err);
                     }
-                  );
-                  // If location data was scanned, include location field in update query
-                } else {
-                  db.collection(dbColl_Servers).updateOne(
-                    { serviceTag: redfishDataObject.System.SKU },
-                    {
-                      $set: {
-                        ip: item,
-                        serviceTag: redfishDataObject.System.SKU,
-                        model: redfishDataObject.System.Model,
-                        hostname: redfishDataObject.System.HostName,
-                        generation: systemGeneration,
-                        location: serverLocation
-                      }
-                    },
-                    err => {
-                      if (err) {
-                        return console.log(err);
-                      }
-                      serverCount++;
-                      console.log(
-                        `Server # ${serverCount} @ ${item} updated in db`
-                      );
-                    }
-                  );
-                }
+                    serverCount++;
+                    console.log(
+                      `Server # ${serverCount} @ ${item} updated in db`
+                    );
+                  }
+                );
+                // }
                 // If no entry with the same service tag is found, add a new entry
               } else {
                 if (!err) {
@@ -271,13 +298,14 @@ async function getRedfishData(idracIps, db) {
                     {
                       ip: item,
                       serviceTag: redfishDataObject.System.SKU,
+                      firmwareVersion: redfishDataObject.fw.FirmwareVersion,
                       model: redfishDataObject.System.Model,
                       hostname: redfishDataObject.System.HostName,
                       generation: systemGeneration,
-                      location: serverLocation,
+                      // location: serverLocation,
                       status: "available",
                       timestamp: "",
-                      comments: ""
+                      comments: "",
                     },
                     { checkKeys: false },
                     (err, res) => {
@@ -294,7 +322,7 @@ async function getRedfishData(idracIps, db) {
             }
           );
       })
-      .catch(error => {
+      .catch((error) => {
         console.warn(error);
       });
   });
@@ -305,10 +333,7 @@ async function getRedfishData(idracIps, db) {
  * @return {array} array of JSON objects, each representing a single iDRAC's data
  */
 function getMongoData(db) {
-  let result = db
-    .collection(dbColl_Servers)
-    .find()
-    .toArray();
+  let result = db.collection(dbColl_Servers).find().toArray();
   return result;
 }
 
@@ -336,7 +361,7 @@ function validateLoginInput(data) {
 
   return {
     errors,
-    isValid: isEmpty(errors)
+    isValid: isEmpty(errors),
   };
 }
 
@@ -382,8 +407,32 @@ function validateRegisterInput(data) {
 
   return {
     errors,
-    isValid: isEmpty(errors)
+    isValid: isEmpty(errors),
   };
+}
+
+async function getFactoryBlock() {
+  return new Promise(function (resolve, reject) {
+    let factoryBlock = [];
+
+    const ps = new Shell({
+      executionPolicy: "Bypass",
+      noProfile: true,
+    });
+
+    ps.addCommand("./shareDriveAccess.ps1");
+    ps.invoke()
+      .then((output) => {
+        factoryBlock.push(output);
+        console.log(output);
+      })
+      .catch((err) => {
+        console.log(err);
+        ps.dispose();
+      });
+
+    resolve(factoryBlock);
+  });
 }
 
 // Launch the server //////////////////////////////////////////////////////////
@@ -395,7 +444,7 @@ app.use(cors(corsOptions));
 
 // Connect to the database, start the server, query iDRACs via RedFish, and populate db
 MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
-  client => {
+  (client) => {
     const _db = client.db(dbName);
     console.log(`Connected to ${dbName}`);
 
@@ -423,13 +472,13 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
         _db
           .collection(dbColl_Users)
           .findOne({ _id: jwt_payload.id })
-          .then(user => {
+          .then((user) => {
             if (user) {
               return done(null, user);
             }
             return done(null, false);
           })
-          .catch(err => console.log(err));
+          .catch((err) => console.log(err));
       })
     );
 
@@ -439,7 +488,7 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
     // Allow parsing of res.body
     app.use(
       bodyParser.urlencoded({
-        extended: true
+        extended: true,
       })
     );
 
@@ -447,7 +496,7 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
 
     // Log API responses to access.log
     var accessLogStream = fs.createWriteStream(__dirname + "/access.log", {
-      flags: "a"
+      flags: "a",
     });
     morganBody(app, { stream: accessLogStream, noColors: true });
 
@@ -466,15 +515,18 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
         .collection(dbColl_Users)
         .findOne({
           username: {
-            $regex: new RegExp("^" + req.body.username.toLowerCase() + "$", "i")
-          }
+            $regex: new RegExp(
+              "^" + req.body.username.toLowerCase() + "$",
+              "i"
+            ),
+          },
         })
-        .then(user => {
+        .then((user) => {
           // Check if user exists
           if (!user) {
             return res.status(404).json({
               success: false,
-              message: "Username not found"
+              message: "Username not found",
             });
           }
 
@@ -485,7 +537,7 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
             // Create JWT Payload
             const payload = {
               id: user.id,
-              name: user.name
+              name: user.name,
             };
 
             // Sign token
@@ -493,14 +545,14 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
               payload,
               keys.secretOrKey,
               {
-                expiresIn: 31556926 // 1 year in seconds
+                expiresIn: 31556926, // 1 year in seconds
               },
               (err, token) => {
                 res.json({
                   success: true,
                   message: "Login is successful",
                   token: "Bearer " + token,
-                  userInfo: user
+                  userInfo: user,
                 });
               }
             );
@@ -528,10 +580,10 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
           .collection(dbColl_Users)
           .findOne({
             email: {
-              $regex: new RegExp("^" + req.body.email.toLowerCase() + "$", "i")
-            }
+              $regex: new RegExp("^" + req.body.email.toLowerCase() + "$", "i"),
+            },
           })
-          .then(user => {
+          .then((user) => {
             if (user) {
               return res
                 .status(400)
@@ -544,11 +596,11 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
                     name: req.body.name,
                     email: req.body.email,
                     username: req.body.username,
-                    password: req.body.password
+                    password: req.body.password,
                   },
                   { checkKeys: false }
                 )
-                .then(user =>
+                .then((user) =>
                   res.json(
                     Object.assign(
                       { success: true, message: "Registration is successful" },
@@ -556,7 +608,7 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
                     )
                   )
                 )
-                .catch(err => console.log(err));
+                .catch((err) => console.log(err));
               console.log("You're registered! Now login");
             }
           });
@@ -569,18 +621,18 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
     app.post("/findServers", (req, res) => {
       console.log("API to scan IPs is called..");
       scanSubnet()
-        .then(response => {
+        .then((response) => {
           if (response.message === "success") {
             console.log("Scan completed successfully.");
             res.json({
               status: true,
-              message: "Scan is complete, file with IPs created."
+              message: "Scan is complete, file with IPs created.",
             });
             return;
           }
           throw new Error();
         })
-        .catch(error => {
+        .catch((error) => {
           console.log("Scan failed with error: ", error.message);
           res.json({ status: false, message: error.message });
         });
@@ -597,7 +649,7 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
 
     // Get collection data from MongoDB and return relevant data
     app.get("/getServers", (req, res) => {
-      getMongoData(_db).then(results => {
+      getMongoData(_db).then((results) => {
         res.send(results);
       });
     });
@@ -617,7 +669,7 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
                   {
                     success: true,
                     message:
-                      "Document with specified _id successfully retrieved"
+                      "Document with specified _id successfully retrieved",
                   },
                   results
                 )
@@ -633,8 +685,8 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
         {
           $set: {
             status: req.body.status,
-            timestamp: req.body.timestamp
-          }
+            timestamp: req.body.timestamp,
+          },
         },
         (err, results) => {
           if (err) {
@@ -659,8 +711,8 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
         { _id: mongoose.Types.ObjectId(req.params.id) },
         {
           $set: {
-            comments: req.body.comments
-          }
+            comments: req.body.comments,
+          },
         },
         (err, results) => {
           if (err) {
@@ -680,21 +732,188 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
     });
 
     // Fetch servers checked out by a specified user
-    app.get("/getUserServers", (req, res) => {
+    app.get("/getUserServers/:name", (req, res) => {
       _db
         .collection(dbColl_Servers)
-        .find({ status: req.body.username })
-        .toArray(function(err, resultArray) {
+        .find({ status: req.params.name })
+        .toArray(function (err, resultArray) {
           if (err) {
             res.status(500).json({ success: false, message: err });
           } else {
             res.status(200).json({
               success: true,
               message: "User servers successfully fetched",
-              results: resultArray
+              results: resultArray,
             });
           }
         });
+    });
+
+    // Fetch names of all the folders listed for Factory Block on the XC Night Flyer Share
+    // app.get("/getIsoFiles", (req, res) => {
+    // let source = "";
+    app.get("/getFactoryBlock", (req, res) => {
+      // const myShellScript = exec("sh mapSharedDrive.sh ./");
+      // myShellScript.stdout.on("data", (data) => {
+      //   console.log("success:" + data);
+      // });
+      // myShellScript.stderr.on("data", (data) => {
+      //   console.error(data);
+      // });
+
+      let source = "/mnt/bmr";
+
+      const getDirectories = (source) =>
+        readdirSync(source, { withFileTypes: true })
+          .filter((dirent) => dirent.isDirectory())
+          .map((dirent) => {
+            return {
+              value: dirent.name,
+              label: dirent.name,
+            };
+          });
+
+      let optionsFactoryBlock = getDirectories(source);
+
+      res.status(200).json({
+        success: true,
+        message: "Factory Blocks successfully fetched",
+        results: optionsFactoryBlock,
+        // results: optionsFactoryBlock,
+      });
+    });
+
+    // Fetch names of .iso files from given directory path
+    app.get("/getBmrIso", (req, res) => {
+      let source = "/mnt/bmr";
+      const getIsoFiles = function (dirPath) {
+        let files = readdirSync(dirPath);
+        let arrayOfFiles = [];
+        files.map((name) => {
+          let extension = name.endsWith("iso") && name.includes("BMR3");
+          if (extension === true) {
+            arrayOfFiles.push(name);
+          }
+        });
+        return arrayOfFiles.map((fileName) => {
+          return {
+            value: fileName,
+            label: fileName,
+          };
+        });
+      };
+
+      console.log("SOURCE IS: " + source);
+      let optionsIsoFile = getIsoFiles(source);
+
+      res.status(200).json({
+        success: true,
+        message: "ISO file paths successfully fetched",
+        results: optionsIsoFile,
+      });
+    });
+
+    // Getting data from Front-END and passing it to the BMR Process Scripts
+    app.post("/bmrFactoryImaging", (req, res) => {
+      // console.log(req.body);
+
+      // Define bmr payload values for mounting network image
+      let ip_arr = req.body.selectedRowData.map((server) => {
+        return server.ip;
+      });
+      let image_name = req.body.selectedBmrIsoOption;
+      let block_name = req.body.selectedFactoryBlockOption;
+      let hypervisor_name = req.body.selectedHypervisorOption;
+
+      let bmr_payload_values = fs
+        .readFileSync("bmr_payload_values.txt")
+        .toString()
+        .replace(/\r/g, "")
+        .split("\n");
+      let share_ip = bmr_payload_values[0];
+      let share_name = bmr_payload_values[1];
+      let share_type = bmr_payload_values[2];
+      let bmr_username = bmr_payload_values[3];
+      let bmr_password = bmr_payload_values[4];
+
+      // console.log(bmr_payload_values);
+
+      // Define values to add to iDRAC LCLOG files
+      // let share_name = "/mnt/bmr";
+
+      // Mount BMR ISO
+      // AZAT SCRIPTS START
+      if (
+        ip_arr !== "" &&
+        share_ip !== "" &&
+        share_name !== "" &&
+        share_type !== "" &&
+        image_name !== "" &&
+        bmr_username !== "" &&
+        bmr_password !== ""
+      ) {
+        bmrIsoProcess
+          .mountNetworkImageOnNodes(
+            ip_arr,
+            share_ip,
+            share_type,
+            share_name,
+            image_name,
+            bmr_username,
+            bmr_password
+          )
+          .then((response) => {
+            console.log(response.message);
+            if (response.success) {
+              // Invoke Bash Script to add entries to iDRAC's LCLOG file
+              for (const ipAddress of ip_arr) {
+                console.log("BMR SHELL SCRIPT LOOP HERE");
+
+                const myShellScript = exec(
+                  `sh bmr-parm.sh ${ipAddress} ${block_name} ${hypervisor_name} ${share_name} ${bmr_username} ${bmr_password}`
+                );
+                myShellScript.stdout.on("data", (data) => {
+                  console.log(`success ${data}`);
+                  // res.status(200).json({
+                  //   success: true,
+                  //   message:
+                  //     "Successfully completed BMR factory imaging process",
+                  // });
+                });
+                myShellScript.stderr.on("data", (data) => {
+                  console.error(data);
+                  // res.status(500).json({
+                  //   success: false,
+                  //   message: data,
+                  // });
+                });
+              }
+            } else {
+              // res
+              //   .status(500)
+              //   .json({ success: false, message: response.message });
+            }
+          });
+      }
+
+      // CHECK SUCCESS FROM RESPONSE
+
+      // ID RESPONSE = SUCCESS
+      // THEN START AHMAD SCRIPT
+      // Invoke Bash Script to add entries to iDRAC's LCLOG file
+      // for (const ipAddress of ip_arr) {
+      //   console.log("BMR SHELL SCRIPT LOOP HERE");
+
+      //   const myShellScript = exec(
+      //     `sh bmr-parm.sh ${ipAddress} ${block_name} ${hypervisor_name} ${share_name} ./`
+      //   );
+      //   myShellScript.stdout.on("data", (data) => {
+      //     console.log(`success ${data}`);
+      //   });
+      //   myShellScript.stderr.on("data", (data) => {
+      //     console.error(data);
+      //   });
+      // }
     });
 
     // Reset password of user with specified password-reset token
@@ -702,7 +921,7 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
       _db
         .collection(dbColl_Users)
         .findOne({ username: req.body.username })
-        .then(user => {
+        .then((user) => {
           // Check if user exists
           if (!user) {
             return res
@@ -714,7 +933,7 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
           if (!Validator.isLength(req.body.password, { min: 6, max: 30 })) {
             return res.status(404).json({
               success: false,
-              message: "Password must be at least 6 characters"
+              message: "Password must be at least 6 characters",
             });
           }
 
@@ -730,10 +949,10 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
             { username: req.body.username },
             {
               $set: {
-                password: req.body.password
-              }
+                password: req.body.password,
+              },
             },
-            function(err, results) {
+            function (err, results) {
               if (err) {
                 res.status(500).json(Object.assign({ success: false }, err));
               } else {
@@ -741,7 +960,7 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
                   Object.assign(
                     {
                       success: true,
-                      message: "Password successfully reset"
+                      message: "Password successfully reset",
                     },
                     results
                   )
