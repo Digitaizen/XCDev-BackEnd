@@ -23,7 +23,7 @@ function checkRedfishSupport(node_ip) {
 
         // Construct options to be used in fetch call
         const agent = new https.Agent({
-            rejectUnauthorized: false,
+            rejectUnauthorized: false
         });
 
         let options = {
@@ -32,25 +32,32 @@ function checkRedfishSupport(node_ip) {
                 "Content-Type": "application/json",
                 Authorization: `Basic ${base64.encode(
                     `${idrac_username}:${idrac_password}`
-                )}`,
+                )}`
             },
-            agent: agent,
+            agent: agent
         };
 
         // Make fetch call on the URL to check if it exists
-        fetch(url, options).then((response) => {
-            if (response.ok) {
-                resolve({
-                    success: true,
-                    message: `${node_ip}'s OEM Boot to ISO via Redfish is supported`,
-                });
-            } else {
+        fetch(url, options)
+            .then((response) => {
+                if (response.ok) {
+                    resolve({
+                        success: true,
+                        message: `Supported`
+                    });
+                } else {
+                    reject({
+                        success: false,
+                        message: `NOT supported`
+                    });
+                }
+            })
+            .catch(error => {
                 reject({
                     success: false,
-                    message: `${node_ip}'s OEM Boot to ISO via Redfish is NOT supported`,
+                    message: `FAIL: Fetch in checkRedfishSupport failed on ${node_ip}: ${error}`
                 });
-            }
-        });
+            });
     });
 }
 
@@ -63,7 +70,7 @@ function checkAttachStatus(node_ip) {
 
         // Construct options to be used in fetch call
         const agent = new https.Agent({
-            rejectUnauthorized: false,
+            rejectUnauthorized: false
         });
 
         let options = {
@@ -72,23 +79,25 @@ function checkAttachStatus(node_ip) {
                 "Content-Type": "application/json",
                 Authorization: `Basic ${base64.encode(
                     `${idrac_username}:${idrac_password}`
-                )}`,
+                )}`
             },
             body: JSON.stringify({}),
-            agent: agent,
+            agent: agent
         };
 
         // Make fetch call on the URL
         fetch(url, options)
             .then((response) => response.json())
             .then((data) => {
-                resolve({ success: true, message: data["ISOAttachStatus"] });
+                resolve({
+                    success: true,
+                    message: data["ISOAttachStatus"]
+                });
             })
-            .catch((err) => {
-                console.error(err);
+            .catch((error) => {
                 reject({
                     success: false,
-                    message: `FAIL: Check of Attach Status on ${node_ip} failed: ${err}`,
+                    message: `FAIL: Fetch in checkAttachStatus failed on ${node_ip}: ${error}`
                 });
             });
     });
@@ -111,7 +120,7 @@ function connectNetworkIsoImage(
 
         // Construct options to be used in fetch call
         const agent = new https.Agent({
-            rejectUnauthorized: false,
+            rejectUnauthorized: false
         });
 
         const payload = {
@@ -120,7 +129,7 @@ function connectNetworkIsoImage(
             ShareType: share_type,
             ImageName: image_name,
             UserName: user_name,
-            Password: user_pass,
+            Password: user_pass
         };
 
         let options = {
@@ -129,10 +138,10 @@ function connectNetworkIsoImage(
                 "Content-Type": "application/json",
                 Authorization: `Basic ${base64.encode(
                     `${idrac_username}:${idrac_password}`
-                )}`,
+                )}`
             },
             body: JSON.stringify(payload),
-            agent: agent,
+            agent: agent
         };
 
         // Display the payload
@@ -142,19 +151,26 @@ function connectNetworkIsoImage(
         console.log(payload);
 
         // Make fetch call on the URL
-        fetch(url, options).then((response) => {
-            if (response.ok) {
-                resolve({
-                    success: true,
-                    message: `PASS: POST command passed to ${node_ip} to connect Network ISO image, status code 200 returned`,
-                });
-            } else {
+        fetch(url, options)
+            .then((response) => {
+                if (response.ok) {
+                    resolve({
+                        success: true,
+                        message: `PASS`
+                    });
+                } else {
+                    reject({
+                        success: false,
+                        message: `FAIL: status code is ${response.status} and error message is ${response.statusText}`
+                    });
+                }
+            })
+            .catch(error => {
                 reject({
                     success: false,
-                    message: `FAIL: POST command failed on ${node_ip} to connect Network ISO image, status code is ${response.status} and error message is ${response.statusText}`,
+                    message: `FAIL: Fetch in connectNetworkISOImage failed on ${node_ip}: ${error}`
                 });
-            }
-        });
+            });
     });
 }
 
@@ -167,7 +183,7 @@ function disconnectNetworkIsoImage(node_ip) {
 
         // Construct options to be used in fetch call
         const agent = new https.Agent({
-            rejectUnauthorized: false,
+            rejectUnauthorized: false
         });
 
         let options = {
@@ -176,26 +192,33 @@ function disconnectNetworkIsoImage(node_ip) {
                 "Content-Type": "application/json",
                 Authorization: `Basic ${base64.encode(
                     `${idrac_username}:${idrac_password}`
-                )}`,
+                )}`
             },
             body: JSON.stringify({}),
-            agent: agent,
+            agent: agent
         };
 
         // Make fetch call on the URL
-        fetch(url, options).then((response) => {
-            if (response.ok) {
-                resolve({
-                    success: true,
-                    message: `PASS: POST command passed to ${node_ip} to detach Network ISO image, status code 200 returned`,
-                });
-            } else {
+        fetch(url, options)
+            .then((response) => {
+                if (response.ok) {
+                    resolve({
+                        success: true,
+                        message: `PASS`
+                    });
+                } else {
+                    reject({
+                        success: false,
+                        message: `FAIL: status code is ${response.status} and error message is ${response.statusText}`
+                    });
+                }
+            })
+            .catch(error => {
                 reject({
                     success: false,
-                    message: `FAIL: POST command failed on ${node_ip} to detach Network ISO image, status code is ${response.status} and error message is ${response.statusText}`,
+                    message: `FAIL: Fetch in disconnectNetworkISOImage failed on ${node_ip}: ${error}`
                 });
-            }
-        });
+            });
     });
 }
 
@@ -208,7 +231,7 @@ function rebootSystem(node_ip, reboot_type) {
 
         // Construct options to be used in fetch call
         const agent = new https.Agent({
-            rejectUnauthorized: false,
+            rejectUnauthorized: false
         });
 
         let options = {
@@ -217,26 +240,33 @@ function rebootSystem(node_ip, reboot_type) {
                 "Content-Type": "application/json",
                 Authorization: `Basic ${base64.encode(
                     `${idrac_username}:${idrac_password}`
-                )}`,
+                )}`
             },
             body: JSON.stringify({ ResetType: reboot_type }),
-            agent: agent,
+            agent: agent
         };
 
         // Make fetch call on the URL
-        fetch(url, options).then((response) => {
-            if (response.ok) {
-                resolve({
-                    success: true,
-                    message: `PASS: POST command passed to reboot ${node_ip}, status code 200 returned`,
-                });
-            } else {
+        fetch(url, options)
+            .then((response) => {
+                if (response.ok) {
+                    resolve({
+                        success: true,
+                        message: `PASS`
+                    });
+                } else {
+                    reject({
+                        success: false,
+                        message: `FAIL: status code is ${response.status} and error message is ${response.statusText}`
+                    });
+                }
+            })
+            .catch(error => {
                 reject({
                     success: false,
-                    message: `FAIL: POST command failed to reboot ${node_ip}, status code is ${response.status} and error message is ${response.statusText}`,
+                    message: `FAIL: Fetch in rebootSystem failed on ${node_ip}: ${error}`
                 });
-            }
-        });
+            });
     });
 }
 
@@ -282,7 +312,7 @@ function bootToNetworkIso(
 
         // Construct options to be used in fetch call
         const agent = new https.Agent({
-            rejectUnauthorized: false,
+            rejectUnauthorized: false
         });
 
         const payload = {
@@ -301,10 +331,10 @@ function bootToNetworkIso(
                 "Content-Type": "application/json",
                 Authorization: `Basic ${base64.encode(
                     `${idrac_username}:${idrac_password}`
-                )}`,
+                )}`
             },
             body: JSON.stringify(payload),
-            agent: agent,
+            agent: agent
         };
 
         // Display what is being used
@@ -320,15 +350,19 @@ function bootToNetworkIso(
                     (response) =>
                         response.json().then((data) => {
                             concrete_job_uri = data.headers["Location"];
-                            resolve({ success: true, message: "booting" });
+                            resolve({
+                                success: true,
+                                message: "booting"
+                            });
                         });
                 } else {
                 }
             })
-
-            .catch((err) => {
-                console.error(err);
-                reject({ success: false, message: err });
+            .catch(error => {
+                reject({
+                    success: false,
+                    message: `FAIL: Fetch in bootToNetworkISO failed on ${node_ip}: ${error}`
+                });
             });
     });
 }
@@ -342,7 +376,7 @@ function detachNetworkIso(node_ip) {
 
         // Construct options to be used in fetch call
         const agent = new https.Agent({
-            rejectUnauthorized: false,
+            rejectUnauthorized: false
         });
 
         let options = {
@@ -351,10 +385,10 @@ function detachNetworkIso(node_ip) {
                 "Content-Type": "application/json",
                 Authorization: `Basic ${base64.encode(
                     `${idrac_username}:${idrac_password}`
-                )}`,
+                )}`
             },
             body: JSON.stringify({}),
-            agent: agent,
+            agent: agent
         };
 
         // Make fetch call on the URL
@@ -364,15 +398,20 @@ function detachNetworkIso(node_ip) {
                 if (response.ok) {
                     resolve({
                         success: true,
-                        message:
-                            "PASS: POST command passed to detach ISO image, status code 200 returned",
+                        message: `PASS`
                     });
                 } else {
                     reject({
                         success: false,
-                        message: `FAIL: POST command failed to detach ISO image, status code is ${response.status} and error message is ${response.statusText}`,
+                        message: `FAIL: status code is ${response.status} and error message is ${response.statusText}`
                     });
                 }
+            })
+            .catch(error => {
+                reject({
+                    success: false,
+                    message: `FAIL: Fetch in detachNetworkISO failed on ${node_ip}: ${error}`
+                });
             });
     });
 }
@@ -386,7 +425,7 @@ function insertVirtualMediaCD(node_ip, img_path) {
 
         // Construct options to be used in fetch call
         const agent = new https.Agent({
-            rejectUnauthorized: false,
+            rejectUnauthorized: false
         });
 
         let options = {
@@ -395,30 +434,37 @@ function insertVirtualMediaCD(node_ip, img_path) {
                 "Content-Type": "application/json",
                 Authorization: `Basic ${base64.encode(
                     `${idrac_username}:${idrac_password}`
-                )}`,
+                )}`
             },
             body: JSON.stringify({
                 Image: img_path,
                 Inserted: true,
                 WriteProtected: true,
             }),
-            agent: agent,
+            agent: agent
         };
 
         // Make fetch call on the URL
-        fetch(url, options).then((response) => {
-            if (response.status != 204) {
+        fetch(url, options)
+            .then((response) => {
+                if (response.status != 204) {
+                    reject({
+                        success: false,
+                        message: `FAIL: error message is ${response.statusText}`
+                    });
+                } else {
+                    resolve({
+                        success: true,
+                        message: `PASS`
+                    });
+                }
+            })
+            .catch(error => {
                 reject({
                     success: false,
-                    message: `FAIL: POST command failed to insert ${img_path}, error message is ${response.statusText}`,
+                    message: `FAIL: Fetch in insertVirtualMediaCD failed on ${node_ip}: ${error}`
                 });
-            } else {
-                resolve({
-                    success: true,
-                    message: `PASS: POST command passed to insert ${img_path}, status code 200 returned`,
-                });
-            }
-        });
+            });
     });
 }
 
@@ -431,7 +477,7 @@ function ejectVirtualMediaCD(node_ip) {
 
         // Construct options to be used in fetch call
         const agent = new https.Agent({
-            rejectUnauthorized: false,
+            rejectUnauthorized: false
         });
 
         let options = {
@@ -440,10 +486,10 @@ function ejectVirtualMediaCD(node_ip) {
                 "Content-Type": "application/json",
                 Authorization: `Basic ${base64.encode(
                     `${idrac_username}:${idrac_password}`
-                )}`,
+                )}`
             },
             body: JSON.stringify({}),
-            agent: agent,
+            agent: agent
         };
 
         // Make fetch call on the URL
@@ -453,19 +499,20 @@ function ejectVirtualMediaCD(node_ip) {
                 if (response.status != 204) {
                     reject({
                         success: false,
-                        message: `FAIL: POST command failed to eject Virtual Media, error message is ${response.statusText}`,
+                        message: `FAIL: error message is ${response.statusText}`
                     });
                 } else {
                     resolve({
                         success: true,
-                        message:
-                            "PASS: POST command passed to eject Virtual Media, status code 200 returned",
+                        message: `PASS`
                     });
                 }
             })
-            .catch((err) => {
-                console.error(err);
-                reject({ message: err });
+            .catch(error => {
+                reject({
+                    success: false,
+                    message: `FAIL: Fetch in ejectVirtualMediaCD failed on ${node_ip}: ${error}`
+                });
             });
     });
 }
@@ -479,7 +526,7 @@ function checkVirtualMediaCdStatus(node_ip) {
 
         // Construct options to be used in fetch call
         const agent = new https.Agent({
-            rejectUnauthorized: false,
+            rejectUnauthorized: false
         });
 
         let options = {
@@ -488,9 +535,9 @@ function checkVirtualMediaCdStatus(node_ip) {
                 "Content-Type": "application/json",
                 Authorization: `Basic ${base64.encode(
                     `${idrac_username}:${idrac_password}`
-                )}`,
+                )}`
             },
-            agent: agent,
+            agent: agent
         };
 
         // Make fetch call on the URL
@@ -499,14 +546,13 @@ function checkVirtualMediaCdStatus(node_ip) {
             .then((data) => {
                 resolve({
                     success: data["Inserted"],
-                    message: `CD Virtual Media Inserted status for ${node_ip} is: ${data["Inserted"]}`,
+                    message: `${data["Inserted"]}`
                 });
             })
-            .catch((err) => {
-                console.error(err);
+            .catch(error => {
                 reject({
                     success: false,
-                    message: `FAIL: CD Virtual Media Inserted status request for ${node_ip} failed: ${err}`,
+                    message: `FAIL: Fetch in checkVirtualMediaCDStatus failed on ${node_ip}: ${error}`
                 });
             });
     });
@@ -522,42 +568,60 @@ function mountNetworkImageOnNodes(idrac_ips, share_ip, share_type, share_name, i
         idrac_ips.forEach(idrac_ip => {
             checkRedfishSupport(idrac_ip)
                 .then(response => {
-                    console.log(`checkRedfishSupport result: ${response.message}`);
+                    console.log(`checkRedfishSupport result for ${idrac_ip} is: ${response.message}`);
                     if (response.success) {
                         checkAttachStatus(idrac_ip)
                             .then(response => {
-                                console.log(`checkAttachStatus result: ${response.message}`);
+                                console.log(`checkAttachStatus result for ${idrac_ip} is: ${response.message}`);
                                 if (response.message === "Attached") {
                                     disconnectNetworkIsoImage(idrac_ip)
                                         .then(response => {
-                                            console.log(`disconnectNetworkIsoImage result: ${response.message}`);
+                                            console.log(`disconnectNetworkIsoImage result for ${idrac_ip} is: ${response.message}`);
                                             if (response.success) {
                                                 connectNetworkIsoImage(idrac_ip, share_ip, share_type, share_name, image_name, user_name, user_pass)
                                                     .then(response => {
-                                                        console.log(`connectNetworkIsoImage result: ${response.message}`);
+                                                        console.log(`connectNetworkIsoImage result for ${idrac_ip} is: ${response.message}`);
                                                         if (response.success) {
                                                             mountedCounter++;
                                                             if (mountedCounter == idrac_ips.length) {
                                                                 if (idrac_ips.length == 1)
-                                                                    resolve({ success: true, message: `${image_name} has been successfuly mounted on the selected node.` });
+                                                                    resolve({
+                                                                        success: true,
+                                                                        message: `---"${image_name}" has been successfuly mounted on the selected node.---`
+                                                                    });
                                                                 else
-                                                                    resolve({ success: true, message: `${image_name} has been successfuly mounted on all selected nodes.` });
+                                                                    resolve({
+                                                                        success: true,
+                                                                        message: `---"${image_name}" has been successfuly mounted on all selected nodes.---`
+                                                                    });
                                                             }
                                                         } else {
-                                                            reject({ success: false, message: response.message });
+                                                            reject({
+                                                                success: false,
+                                                                message: response.message
+                                                            });
                                                         }
                                                     })
                                                     .catch(error => {
-                                                        console.log(`FAIL: connectNetworkIsoImage for ${idrac_ip} failed: ${error.message}`);
-                                                        reject({ success: false, message: `FAIL: connectNetworkIsoImage for ${idrac_ip} failed: ${error.message}` });
+                                                        console.log(`CATCH in mountNetworkImageOnNodes: ${error.message}`);
+                                                        reject({
+                                                            success: false,
+                                                            message: `CATCH in mountNetworkImageOnNodes: ${error.message}`
+                                                        });
                                                     })
                                             } else {
-                                                reject({ success: false, message: response.message });
+                                                reject({
+                                                    success: false,
+                                                    message: response.message
+                                                });
                                             }
                                         })
                                         .catch(error => {
-                                            console.log(`FAIL: disconnectNetworkIsoImage for ${idrac_ip} failed: ${error.message}`);
-                                            reject({ success: false, message: `FAIL: disconnectNetworkIsoImage for ${idrac_ip} failed: ${error.message}` });
+                                            console.log(`CATCH in mountNetworkImageOnNodes: ${error.message}`);
+                                            reject({
+                                                success: false,
+                                                message: `CATCH in mountNetworkImageOnNodes: ${error.message}`
+                                            });
                                         })
                                 }
                                 else {
@@ -568,32 +632,53 @@ function mountNetworkImageOnNodes(idrac_ips, share_ip, share_type, share_name, i
                                                 mountedCounter++;
                                                 if (mountedCounter == idrac_ips.length) {
                                                     if (idrac_ips.length == 1)
-                                                        resolve({ success: true, message: `${image_name} has been successfuly mounted on the selected node.` });
+                                                        resolve({
+                                                            success: true,
+                                                            message: `---"${image_name}" has been successfuly mounted on the selected node.---`
+                                                        });
                                                     else
-                                                        resolve({ success: true, message: `${image_name} has been successfuly mounted on all selected nodes.` });
+                                                        resolve({
+                                                            success: true,
+                                                            message: `---"${image_name}" has been successfuly mounted on all selected nodes.---`
+                                                        });
                                                 }
                                             } else {
-                                                reject({ success: false, message: response.message });
+                                                reject({
+                                                    success: false,
+                                                    message: response.message
+                                                });
                                             }
                                         })
                                         .catch(error => {
-                                            console.log(`FAIL: connectNetworkIsoImage for ${idrac_ip} failed: ${error.message}`);
-                                            reject({ success: false, message: `FAIL: connectNetworkIsoImage for ${idrac_ip} failed: ${error.message}` });
+                                            console.log(`CATCH in mountNetworkImageOnNodes: ${error.message}`);
+                                            reject({
+                                                success: false,
+                                                message: `CATCH in mountNetworkImageOnNodes: ${error.message}`
+                                            });
                                         })
                                 }
                             })
                             .catch(error => {
-                                console.log(`FAIL: checkAttachStatus for ${idrac_ip} failed: ${error.message}`);
-                                reject({ success: false, message: `FAIL: checkAttachStatus for ${idrac_ip} failed: ${error.message}` });
+                                console.log(`CATCH in mountNetworkImageOnNodes: ${error.message}`);
+                                reject({
+                                    success: false,
+                                    message: `CATCH in mountNetworkImageOnNodes: ${error.message}`
+                                });
                             })
 
                     } else {
-                        reject({ success: false, message: `iDRAC version installed on ${idrac_ip} does not support OEM boot via Redfish` });
+                        reject({
+                            success: false,
+                            message: `iDRAC version installed on ${idrac_ip} does not support OEM boot via Redfish`
+                        });
                     }
                 })
                 .catch(error => {
-                    console.log(`FAIL: checkRedfishSupport for ${idrac_ip} failed: ${error.message}`);
-                    reject({ success: false, message: `FAIL: checkRedfishSupport for ${idrac_ip} failed: ${error.message}` });
+                    console.log(`CATCH in mountNetworkImageOnNodes: ${error.message}`);
+                    reject({
+                        success: false,
+                        message: `CATCH in mountNetworkImageOnNodes: ${error.message}`
+                    });
                 });
         })
     })
@@ -608,7 +693,7 @@ function checkCurrentPowerState(node_ip) {
 
         // Construct options to be used in fetch call
         const agent = new https.Agent({
-            rejectUnauthorized: false,
+            rejectUnauthorized: false
         });
 
         let options = {
@@ -617,9 +702,9 @@ function checkCurrentPowerState(node_ip) {
                 "Content-Type": "application/json",
                 Authorization: `Basic ${base64.encode(
                     `${idrac_username}:${idrac_password}`
-                )}`,
+                )}`
             },
-            agent: agent,
+            agent: agent
         };
 
         // Make fetch call on the URL
@@ -631,11 +716,10 @@ function checkCurrentPowerState(node_ip) {
                     message: data["PowerState"]
                 });
             })
-            .catch((err) => {
-                console.error(err);
+            .catch(error => {
                 reject({
                     success: false,
-                    message: `FAIL: Current Power State status request for ${node_ip} failed: ${err}`
+                    message: `FAIL: Fetch in checkCurrentPowerState failed on ${node_ip}: ${error}`
                 });
             });
     })
@@ -652,43 +736,56 @@ function rebootSelectedNodes(idrac_ips) {
             checkCurrentPowerState(idrac_ip)
                 .then(response => {
                     if (response.success) {
-                        console.log(`checkCurrentPowerState for ${idrac_ip} result: ${response.message}`);
+                        console.log(`checkCurrentPowerState result for ${idrac_ip} is: ${response.message}`);
                         if (response.message == "On")
                             rebootType = "ForceRestart";
                         else
                             rebootType = "PushPowerButton";
-                        console.log(`Reboot Type for ${idrac_ip} set to: ${rebootType}`);
+                        console.log(`rebootType for ${idrac_ip} set to: ${rebootType}`);
                         rebootSystem(idrac_ip, rebootType)
                             .then((response) => {
-                                console.log(`rebootSystem result: ${response.message}`);
+                                console.log(`rebootSystem result for ${idrac_ip} is: ${response.message}`);
                                 if (response.success) {
                                     rebootCounter++;
                                     if (rebootCounter == idrac_ips.length) {
                                         if (idrac_ips.length == 1)
-                                            resolve({ success: true, message: `Selected node has been successfuly rebooted.` });
+                                            resolve({
+                                                success: true,
+                                                message: `---Selected node has been successfuly rebooted.---`
+                                            });
                                         else
-                                            resolve({ success: true, message: `All selected nodes have been successfuly rebooted.` });
+                                            resolve({
+                                                success: true,
+                                                message: `---All selected nodes have been successfuly rebooted.---`
+                                            });
                                     }
-                                } else reject({ success: false, message: response.message });
+                                } else reject({
+                                    success: false,
+                                    message: response.message
+                                });
                             })
                             .catch((error) => {
-                                console.log(
-                                    `FAIL: rebootSystem for ${idrac_ip} failed: ${error.message}`
-                                );
+                                console.log(`CATCH in rebootSelectedNodes: ${error.message}`);
                                 reject({
                                     success: false,
-                                    message: `FAIL: rebootSystem for ${idrac_ip} failed: ${error.message}`,
+                                    message: `CATCH in rebootSelectedNodes: ${error.message}`
                                 });
                             })
                     }
                     else {
                         console.log(`Could not get Power State from ${idrac_ip}, error: ${response.message}`);
-                        reject({ success: false, message: `Could not get Power State from ${idrac_ip}, error: ${response.message}` });
+                        reject({
+                            success: false,
+                            message: `Could not get Power State from ${idrac_ip}, error: ${response.message}`
+                        });
                     }
                 })
                 .catch(error => {
-                    console.log(`FAIL: checkCurrentPowerState on ${idrac_ip} failed: ${error.message}`);
-                    reject({ success: false, message: `FAIL: checkCurrentPowerState on ${idrac_ip} failed: ${error.message}` });
+                    console.log(`CATCH in rebootSelectedNodes: ${error.message}`);
+                    reject({
+                        success: false,
+                        message: `CATCH in rebootSelectedNodes: ${error.message}`
+                    });
                 });
         });
     });
@@ -754,7 +851,7 @@ function rebootSelectedNodes(idrac_ips) {
 //                     .then(
 //                         checkAttachStatus(idrac_ip)
 //                             .then(response => {
-//                                 console.log(`checkAttachStatus result: ${response.message}`);
+//                                 console.log(`checkAttachStatus result for ${idrac_ip}: ${response.message}`);
 //                                 if (response.message === "Attached") {
 //                                     // disconnectNetworkIsoImage(idrac_ip)
 //                                     //     .then(response => {
