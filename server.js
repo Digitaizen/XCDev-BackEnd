@@ -836,11 +836,6 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
       let bmr_username = bmr_payload_values[3];
       let bmr_password = bmr_payload_values[4];
 
-      // console.log(bmr_payload_values);
-
-      // Define values to add to iDRAC LCLOG files
-      // let share_name = "/mnt/bmr";
-
       // Mount BMR ISO
       // AZAT SCRIPTS START
       if (
@@ -864,56 +859,62 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
           )
           .then((response) => {
             console.log(response.message);
+            // If ISO mount successful, make lclog comments with BMR info on each iDRAC
             if (response.success) {
-              // Invoke Bash Script to add entries to iDRAC's LCLOG file
-              for (const ipAddress of ip_arr) {
-                console.log("BMR SHELL SCRIPT LOOP HERE");
+              let lclogs = [];
 
-                const myShellScript = exec(
-                  `sh bmr-parm.sh ${ipAddress} ${block_name} ${hypervisor_name} ${share_name} ${bmr_username} ${bmr_password}`
+              // Define calls to lclog comment script for each server
+              for (const ipAddress of ip_arr) {
+                // Wrap script calls in Promises and store them in 'lclogs' array
+                lclogs.push(
+                  new Promise((resolve, reject) => {
+                    const myShellScript = exec(
+                      `sh bmr-parm.sh ${ipAddress} ${block_name} ${hypervisor_name} ${share_name} ${bmr_username} ${bmr_password}`
+                    );
+                    myShellScript.stdout.on("data", (data) => {
+                      // console.log(data);
+                      resolve({
+                        success: true,
+                        message: `Created lclog comment for server ${ipAddress} with seq id ${data}`,
+                      });
+                    });
+                    myShellScript.stderr.on("data", (data) => {
+                      // console.error(data);
+                      reject({
+                        success: false,
+                        message: data,
+                      });
+                    });
+                  })
                 );
-                myShellScript.stdout.on("data", (data) => {
-                  console.log(`success ${data}`);
-                  // res.status(200).json({
-                  //   success: true,
-                  //   message:
-                  //     "Successfully completed BMR factory imaging process",
-                  // });
-                });
-                myShellScript.stderr.on("data", (data) => {
-                  console.error(data);
-                  // res.status(500).json({
-                  //   success: false,
-                  //   message: data,
-                  // });
-                });
               }
+
+              // Execute each lclog script call
+              Promise.all(lclogs).then((responses) => {
+                console.log(responses);
+
+                // After lclog comments finish, reboot each server
+                bmrIsoProcess.rebootSelectedNodes(ip_arr).then((response) => {
+                  console.log(response.message);
+
+                  if (response.success) {
+                    res
+                      .status(200)
+                      .json({ success: true, message: response.message });
+                  } else {
+                    res
+                      .status(500)
+                      .json({ success: false, message: response.message });
+                  }
+                });
+              });
             } else {
-              // res
-              //   .status(500)
-              //   .json({ success: false, message: response.message });
+              res
+                .status(500)
+                .json({ success: false, message: response.message });
             }
           });
       }
-
-      // CHECK SUCCESS FROM RESPONSE
-
-      // ID RESPONSE = SUCCESS
-      // THEN START AHMAD SCRIPT
-      // Invoke Bash Script to add entries to iDRAC's LCLOG file
-      // for (const ipAddress of ip_arr) {
-      //   console.log("BMR SHELL SCRIPT LOOP HERE");
-
-      //   const myShellScript = exec(
-      //     `sh bmr-parm.sh ${ipAddress} ${block_name} ${hypervisor_name} ${share_name} ./`
-      //   );
-      //   myShellScript.stdout.on("data", (data) => {
-      //     console.log(`success ${data}`);
-      //   });
-      //   myShellScript.stderr.on("data", (data) => {
-      //     console.error(data);
-      //   });
-      // }
     });
 
     // Reset password of user with specified password-reset token
