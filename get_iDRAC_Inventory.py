@@ -153,6 +153,9 @@ def get_system_information():
             ):
                 pass
             elif i[0] == "Oem":
+                idrac_inventory["System Information"]["Oem"] = {}
+                idrac_inventory["System Information"]["Oem"]["Dell"] = {}
+                idrac_inventory["System Information"]["Oem"]["Dell"]["DellSystem"] = {}
                 for ii in i[1]["Dell"]["DellSystem"].items():
                     if (
                         "@odata"
@@ -163,7 +166,9 @@ def get_system_information():
                     ):
                         pass
                     else:
-                        idrac_inventory["System Information"][ii[0]] = ii[1]
+                        idrac_inventory["System Information"]["Oem"]["Dell"][
+                            "DellSystem"
+                        ][ii[0]] = ii[1]
 
             elif i[0] == "Boot":
                 try:
@@ -193,6 +198,7 @@ def get_memory_information():
         dimm = i["@odata.id"].split("/")[-1]
         try:
             dimm_slot = re.search("DIMM.+", dimm).group()
+            idrac_inventory["Memory Information"][dimm_slot] = {}
         except:
             print("\n- FAIL, unable to get dimm slot info")
             sys.exit()
@@ -219,14 +225,21 @@ def get_memory_information():
                 ):
                     pass
                 elif ii[0] == "Oem":
+                    idrac_inventory["Memory Information"][dimm_slot]["Oem"] = {}
+                    idrac_inventory["Memory Information"][dimm_slot]["Oem"]["Dell"] = {}
+                    idrac_inventory["Memory Information"][dimm_slot]["Oem"]["Dell"][
+                        "DellMemory"
+                    ] = {}
                     for iii in ii[1]["Dell"]["DellMemory"].items():
                         # if iii[0] == "@odata.context" or iii[0] == "@odata.type":
                         if "@odata" in iii[0]:
                             pass
                         else:
-                            idrac_inventory["Memory Information"][iii[0]] = iii[1]
+                            idrac_inventory["Memory Information"][dimm_slot]["Oem"][
+                                "Dell"
+                            ]["DellMemory"][iii[0]] = iii[1]
                 else:
-                    idrac_inventory["Memory Information"][ii[0]] = ii[1]
+                    idrac_inventory["Memory Information"][dimm_slot][ii[0]] = ii[1]
 
 
 def get_cpu_information():
