@@ -1,10 +1,13 @@
 #
 # GetSystemHWInventoryREDFISH. Python script using Redfish API to get system hardware inventory
+# Modification: dumps extracted data to a JSON file instead of the text one; adds/removes certain
+# data points
 #
 # _author_ = Texas Roemer <Texas_Roemer@Dell.com>
-# _version_ = 7.0
+# _modified_ = Azat Salikhov <Azat_Salikhov@Dellteam.com>
+# _version_ = 7.1
 #
-# Copyright (c) 2018, Dell, Inc.
+# Copyright (c) 2020, Dell, Inc.
 #
 # This software is licensed to you under the GNU General Public License,
 # version 2 (GPLv2). There is NO WARRANTY for this software, express or
@@ -64,24 +67,35 @@ idrac_ip = args["ip"]
 idrac_username = args["u"]
 idrac_password = args["p"]
 
+idrac_inventory = {
+    "System Information": {},
+    "Memory Information": {},
+    "CPU Information": {},
+    "Storage Controller Information": {},
+    "Storage Disks Information": {},
+    "Network Device Information": {},
+    "Power Supply Information": {},
+    "Backplane Information": {},
+}
+
 try:
-    os.remove("hw_inventory.txt")
+    os.remove("hw_inventory.json")
 except:
     pass
 
 
-f = open("hw_inventory.txt", "a")
-d = datetime.now()
-current_date_time = "- Data collection timestamp: %s-%s-%s  %s:%s:%s\n" % (
-    d.month,
-    d.day,
-    d.year,
-    d.hour,
-    d.minute,
-    d.second,
-)
-f.writelines(current_date_time)
-f.close()
+# f = open("hw_inventory.txt", "a")
+# d = datetime.now()
+# current_date_time = "- Data collection timestamp: %s-%s-%s  %s:%s:%s\n" % (
+#     d.month,
+#     d.day,
+#     d.year,
+#     d.hour,
+#     d.minute,
+#     d.second,
+# )
+# f.writelines(current_date_time)
+# f.close()
 
 
 def check_supported_idrac_version():
@@ -101,7 +115,6 @@ def check_supported_idrac_version():
 
 
 def get_system_information():
-    f = open("hw_inventory.txt", "a")
     response = requests.get(
         "https://%s/redfish/v1/Systems/System.Embedded.1" % idrac_ip,
         verify=False,
@@ -112,58 +125,58 @@ def get_system_information():
         print("\n- FAIL, get command failed, error is: %s" % data)
         sys.exit()
     else:
-        message = "\n---- System Information ----\n"
-        f.writelines(message)
-        f.writelines("\n")
-        print(message)
-    for i in data.items():
-        if (
-            i[0] == "@odata.id"
-            or i[0] == "@odata.context"
-            or i[0] == "Links"
-            or i[0] == "Actions"
-            or i[0] == "@odata.type"
-            or i[0] == "Description"
-            or i[0] == "EthernetInterfaces"
-            or i[0] == "Storage"
-            or i[0] == "Processors"
-            or i[0] == "Memory"
-            or i[0] == "SecureBoot"
-            or i[0] == "NetworkInterfaces"
-            or i[0] == "Bios"
-            or i[0] == "SimpleStorage"
-            or i[0] == "PCIeDevices"
-            or i[0] == "PCIeFunctions"
-        ):
-            pass
-        elif i[0] == "Oem":
-            for ii in i[1]["Dell"]["DellSystem"].items():
-                if ii[0] == "@odata.context" or ii[0] == "@odata.type":
-                    pass
-                else:
-                    message = "%s: %s" % (ii[0], ii[1])
-                    f.writelines(message)
-                    f.writelines("\n")
-                    print(message)
+        # message = "\n---- System Information ----"
+        # print(message)
+        # Grab the whole returned json data and dump it into a json file
+        # with open("hw_inventory.json", "w") as write_file:
+        #     json.dump(data, write_file, indent=2)
 
-        elif i[0] == "Boot":
-            try:
-                message = "BiosBootMode: %s" % i[1]["BootSourceOverrideMode"]
-                f.writelines(message)
-                f.writelines("\n")
-                print(message)
-            except:
+        for i in data.items():
+            if (
+                # i[0] == "@odata.id"
+                # or i[0] == "@odata.context"
+                "@odata" in i[0]
+                or i[0] == "Links"
+                or i[0] == "Actions"
+                # or i[0] == "@odata.type"
+                or i[0] == "Description"
+                or i[0] == "EthernetInterfaces"
+                or i[0] == "Storage"
+                or i[0] == "Processors"
+                or i[0] == "Memory"
+                or i[0] == "SecureBoot"
+                or i[0] == "NetworkInterfaces"
+                or i[0] == "Bios"
+                or i[0] == "SimpleStorage"
+                or i[0] == "PCIeDevices"
+                or i[0] == "PCIeFunctions"
+            ):
                 pass
-        else:
-            message = "%s: %s" % (i[0], i[1])
-            f.writelines(message)
-            f.writelines("\n")
-            print(message)
-    f.close()
+            elif i[0] == "Oem":
+                for ii in i[1]["Dell"]["DellSystem"].items():
+                    if (
+                        "@odata"
+                        in ii[0]
+                        # ii[0] == "@odata.context"
+                        # or ii[0] == "@odata.type"
+                        # or ii[0] == "@odata.id"
+                    ):
+                        pass
+                    else:
+                        idrac_inventory["System Information"][ii[0]] = ii[1]
+
+            elif i[0] == "Boot":
+                try:
+                    idrac_inventory["System Information"]["BiosBootMode"] = [i[1]][
+                        "BootSourceOverrideMode"
+                    ]
+                except:
+                    pass
+            else:
+                idrac_inventory["System Information"][i[0]] = i[1]
 
 
 def get_memory_information():
-    f = open("hw_inventory.txt", "a")
     response = requests.get(
         "https://%s/redfish/v1/Systems/System.Embedded.1/Memory" % idrac_ip,
         verify=False,
@@ -173,11 +186,9 @@ def get_memory_information():
     if response.status_code != 200:
         print("\n- FAIL, get command failed, error is: %s" % data)
         sys.exit()
-    else:
-        message = "\n---- Memory Information ----"
-        f.writelines(message)
-        f.writelines("\n")
-        print(message)
+    # else:
+    #     message = "\n---- Memory Information ----"
+    #     print(message)
     for i in data["Members"]:
         dimm = i["@odata.id"].split("/")[-1]
         try:
@@ -195,37 +206,30 @@ def get_memory_information():
             print("\n- FAIL, get command failed, error is: %s" % sub_data)
             sys.exit()
         else:
-            message = "\n- Memory details for %s -\n" % dimm_slot
-            f.writelines(message)
-            f.writelines("\n")
-            print(message)
+            # message = "\n- Memory details for %s -\n" % dimm_slot
+            # print(message)
             for ii in sub_data.items():
                 if (
-                    ii[0] == "@odata.id"
-                    or ii[0] == "@odata.context"
+                    "@odata" in ii[0]
+                    # ii[0] == "@odata.id"
+                    # or ii[0] == "@odata.context"
+                    or ii[0] == "Assembly"
                     or ii[0] == "Metrics"
                     or ii[0] == "Links"
                 ):
                     pass
                 elif ii[0] == "Oem":
                     for iii in ii[1]["Dell"]["DellMemory"].items():
-                        if iii[0] == "@odata.context" or iii[0] == "@odata.type":
+                        # if iii[0] == "@odata.context" or iii[0] == "@odata.type":
+                        if "@odata" in iii[0]:
                             pass
                         else:
-                            message = "%s: %s" % (iii[0], iii[1])
-                            f.writelines(message)
-                            f.writelines("\n")
-                            print(message)
+                            idrac_inventory["Memory Information"][iii[0]] = iii[1]
                 else:
-                    message = "%s: %s" % (ii[0], ii[1])
-                    f.writelines(message)
-                    f.writelines("\n")
-                    print(message)
-    f.close()
+                    idrac_inventory["Memory Information"][ii[0]] = ii[1]
 
 
 def get_cpu_information():
-    f = open("hw_inventory.txt", "a")
     response = requests.get(
         "https://%s/redfish/v1/Systems/System.Embedded.1/Processors" % idrac_ip,
         verify=False,
@@ -235,11 +239,7 @@ def get_cpu_information():
     if response.status_code != 200:
         print("\n- FAIL, get command failed, error is: %s" % data)
         sys.exit()
-    else:
-        message = "\n---- Processor Information ----"
-        f.writelines(message)
-        f.writelines("\n")
-        print(message)
+
     for i in data["Members"]:
         cpu = i["@odata.id"].split("/")[-1]
         response = requests.get(
@@ -252,35 +252,27 @@ def get_cpu_information():
             print("\n- FAIL, get command failed, error is: %s" % sub_data)
             sys.exit()
         else:
-            message = "\n- Processor details for %s -\n" % cpu
-            f.writelines(message)
-            f.writelines("\n")
-            print(message)
             for ii in sub_data.items():
                 if (
-                    ii[0] == "@odata.id"
-                    or ii[0] == "@odata.context"
+                    "@odata" in ii[0]
+                    # ii[0] == "@odata.id"
+                    # or ii[0] == "@odata.context"
                     or ii[0] == "Metrics"
                     or ii[0] == "Links"
                     or ii[0] == "Description"
-                    or ii[0] == "@odata.type"
+                    or ii[0] == "Assembly"
+                    # or ii[0] == "@odata.type"
                 ):
                     pass
                 elif ii[0] == "Oem":
                     for iii in ii[1]["Dell"]["DellProcessor"].items():
-                        if iii[0] == "@odata.context" or iii[0] == "@odata.type":
+                        if "@odata" in iii[0]:
+                            # if iii[0] == "@odata.context" or iii[0] == "@odata.type":
                             pass
                         else:
-                            message = "%s: %s" % (iii[0], iii[1])
-                            f.writelines(message)
-                            f.writelines("\n")
-                            print(message)
+                            idrac_inventory["CPU Information"][iii[0]] = iii[1]
                 else:
-                    message = "%s: %s" % (ii[0], ii[1])
-                    f.writelines(message)
-                    f.writelines("\n")
-                    print(message)
-    f.close()
+                    idrac_inventory["CPU Information"][ii[0]] = ii[1]
 
 
 def get_fan_information():
@@ -367,11 +359,9 @@ def get_ps_information():
     if response.status_code != 200:
         print("\n- FAIL, get command failed, error is: %s" % data)
         sys.exit()
-    else:
-        message = "\n---- Power Supply Information ----\n"
-        f.writelines(message)
-        f.writelines("\n")
-        print(message)
+    # else:
+    #     message = "\n---- Power Supply Information ----\n"
+    #     print(message)
     if data["Links"]["PoweredBy"] == []:
         print("- WARNING, no power supplies detected for system")
 
@@ -389,38 +379,29 @@ def get_ps_information():
                 else:
                     data_get = response.json()
                     if "PowerSupplies" not in data_get.keys():
-                        message = "\n- Details for %s -\n" % data_get["Name"]
-                        f.writelines(message)
-                        f.writelines("\n")
-                        print(message)
+                        # message = "\n- Details for %s -\n" % data_get["Name"]
+                        # print(message)
                         for i in data_get.items():
                             if i[0] == "Oem":
                                 try:
                                     for ii in i[1]["Dell"]["DellPowerSupply"].items():
-                                        message = "%s: %s" % (ii[0], ii[1])
-                                        f.writelines(message)
-                                        f.writelines("\n")
-                                        print(message)
+                                        idrac_inventory["Power Supply Information"][
+                                            ii[0]
+                                        ] = ii[1]
                                 except:
                                     print(
                                         "- FAIL, unable to find Dell PowerSupply OEM information"
                                     )
                                     sys.exit()
                             else:
-                                message = "%s: %s" % (i[0], i[1])
-                                f.writelines(message)
-                                f.writelines("\n")
-                                print(message)
-
+                                idrac_inventory["Power Supply Information"][i[0]] = i[1]
                     else:
                         if len(data["Links"]["PoweredBy"]) == 1:
-                            message = (
-                                "\n- Details for %s -\n"
-                                % data_get["PowerSupplies"][0]["Name"]
-                            )
-                            f.writelines(message)
-                            f.writelines("\n")
-                            print(message)
+                            # message = (
+                            #     "\n- Details for %s -\n"
+                            #     % data_get["PowerSupplies"][0]["Name"]
+                            # )
+                            # print(message)
                             for i in data_get.items():
                                 if i[0] == "PowerSupplies":
                                     for ii in i[1]:
@@ -430,42 +411,30 @@ def get_ps_information():
                                                     for iiii in iii[1]["Dell"][
                                                         "DellPowerSupply"
                                                     ].items():
-                                                        message = "%s: %s" % (
-                                                            iiii[0],
-                                                            iiii[1],
-                                                        )
-                                                        f.writelines(message)
-                                                        f.writelines("\n")
-                                                        print(message)
+                                                        idrac_inventory[
+                                                            "Power Supply Information"
+                                                        ][iiii[0]] = iiii[1]
                                                 except:
                                                     print(
                                                         "- FAIL, unable to find Dell PowerSupply OEM information"
                                                     )
                                                     sys.exit()
-
                                             else:
-                                                message = "%s: %s" % (iii[0], iii[1])
-                                                f.writelines(message)
-                                                f.writelines("\n")
-                                                print(message)
-
+                                                idrac_inventory[
+                                                    "Power Supply Information"
+                                                ][iii[0]] = iii[1]
                                 elif i[0] == "Voltages":
                                     pass
                                 elif i[0] == "PowerControl":
                                     for ii in i[1]:
                                         for iii in ii.items():
-                                            message = "%s: %s" % (iii[0], iii[1])
-                                            f.writelines(message)
-                                            f.writelines("\n")
-                                            print(message)
-
+                                            idrac_inventory["Power Supply Information"][
+                                                iii[0]
+                                            ] = iii[1]
                                 else:
-                                    message = "%s: %s" % (i[0], i[1])
-                                    f.writelines(message)
-                                    f.writelines("\n")
-                                    print(message)
-                            print("\n")
-                            f.writelines("\n")
+                                    idrac_inventory["Power Supply Information"][
+                                        i[0]
+                                    ] = i[1]
                         else:
                             for i in data_get.items():
                                 if i[0] == "PowerSupplies":
@@ -476,44 +445,32 @@ def get_ps_information():
                                     return
                                 else:
                                     for i in psu_ids:
-                                        message = "\n- Details for %s -\n" % i["Name"]
-                                        f.writelines(message)
-                                        f.writelines("\n")
-                                        print(message)
+                                        # message = "\n- Details for %s -\n" % i["Name"]
+                                        # print(message)
                                         for ii in i.items():
                                             if ii[0] == "Oem":
                                                 try:
                                                     for iii in ii[1]["Dell"][
                                                         "DellPowerSupply"
                                                     ].items():
-                                                        message = "%s: %s" % (
-                                                            iii[0],
-                                                            iii[1],
-                                                        )
-                                                        f.writelines(message)
-                                                        f.writelines("\n")
-                                                        print(message)
+                                                        idrac_inventory[
+                                                            "Power Supply Information"
+                                                        ][iii[0]] = iii[1]
                                                 except:
                                                     print(
                                                         "- FAIL, unable to find Dell PowerSupply OEM information"
                                                     )
                                                     sys.exit()
                                             else:
-                                                message = "%s: %s" % (ii[0], ii[1])
-                                                f.writelines(message)
-                                                f.writelines("\n")
-                                                print(message)
-                                        print("\n")
+                                                idrac_inventory[
+                                                    "Power Supply Information"
+                                                ][ii[0]] = ii[1]
                                         count += 1
-    f.close()
 
 
 def get_storage_controller_information():
-    f = open("hw_inventory.txt", "a")
-    message = "\n---- Controller Information ----"
-    f.writelines(message)
-    f.writelines("\n")
-    print(message)
+    # message = "\n---- Controller Information ----"
+    # print(message)
     global controller_list
     controller_list = []
     response = requests.get(
@@ -532,10 +489,8 @@ def get_storage_controller_information():
             auth=(idrac_username, idrac_password),
         )
         data = response.json()
-        message = "\n - Detailed controller information for %s -\n" % i.split("/")[-1]
-        f.writelines(message)
-        f.writelines("\n")
-        print(message)
+        # message = "\n - Detailed controller information for %s -\n" % i.split("/")[-1]
+        # print(message)
         for i in data.items():
             if i[0] == "Status":
                 pass
@@ -546,45 +501,29 @@ def get_storage_controller_information():
                     for iii in ii.items():
                         if iii[0] == "Status":
                             for iiii in iii[1].items():
-                                message = "%s: %s" % (iiii[0], iiii[1])
-                                f.writelines(message)
-                                f.writelines("\n")
-                                print(message)
+                                idrac_inventory["Storage Controller Information"][
+                                    iiii[0]
+                                ] = iiii[1]
                         else:
-                            message = "%s: %s" % (iii[0], iii[1])
-                            f.writelines(message)
-                            f.writelines("\n")
-                            print(message)
+                            idrac_inventory["Storage Controller Information"][
+                                iii[0]
+                            ] = [iii[1]]
             elif i[0] == "Oem":
                 try:
                     for ii in i[1]["Dell"]["DellController"].items():
-                        message = "%s: %s" % (ii[0], ii[1])
-                        f.writelines(message)
-                        f.writelines("\n")
-                        print(message)
+                        idrac_inventory["Storage Controller Information"][ii[0]] = ii[1]
                 except:
                     for ii in i[1]["Dell"].items():
-                        message = "%s: %s" % (ii[0], ii[1])
-                        f.writelines(message)
-                        f.writelines("\n")
-                        print(message)
-
+                        idrac_inventory["Storage Controller Information"][ii[0]] = ii[1]
             else:
-                message = "%s: %s" % (i[0], i[1])
-                f.writelines(message)
-                f.writelines("\n")
-                print(message)
+                idrac_inventory["Storage Controller Information"][i[0]] = i[1]
     else:
         pass
-    f.close()
 
 
 def get_storage_disks_information():
-    f = open("hw_inventory.txt", "a")
-    message = "\n---- Disk Information ----"
-    f.writelines(message)
-    f.writelines("\n")
-    print(message)
+    # message = "\n---- Disk Information ----"
+    # print(message)
     for i in controller_list:
         response = requests.get(
             "https://%s/redfish/v1/Systems/System.Embedded.1/Storage/%s"
@@ -600,8 +539,6 @@ def get_storage_disks_information():
             sys.exit()
         if data["Drives"] == []:
             message = "\n- WARNING, no drives detected for %s" % i.split("/")[-1]
-            f.writelines(message)
-            f.writelines("\n")
             print(message)
         else:
             for i in data["Drives"]:
@@ -612,36 +549,27 @@ def get_storage_disks_information():
                         auth=(idrac_username, idrac_password),
                     )
                     data = response.json()
-                    message = (
-                        "\n - Detailed drive information for %s -\n"
-                        % ii[1].split("/")[-1]
-                    )
-                    f.writelines(message)
-                    f.writelines("\n")
-                    print(message)
+                    # message = (
+                    #     "\n - Detailed drive information for %s -\n"
+                    #     % ii[1].split("/")[-1]
+                    # )
+                    # print(message)
                     for ii in data.items():
                         if ii[0] == "Oem":
                             for iii in ii[1]["Dell"]["DellPhysicalDisk"].items():
-                                message = "%s: %s" % (iii[0], iii[1])
-                                f.writelines(message)
-                                f.writelines("\n")
-                                print(message)
+                                idrac_inventory["Storage Disks Information"][
+                                    iii[0]
+                                ] = iii[1]
                         elif ii[0] == "Status":
                             for iii in ii[1].items():
-                                message = "%s: %s" % (iii[0], iii[1])
-                                f.writelines(message)
-                                f.writelines("\n")
-                                print(message)
+                                idrac_inventory["Storage Disks Information"][
+                                    iii[0]
+                                ] = iii[1]
                         else:
-                            message = "%s: %s" % (ii[0], ii[1])
-                            f.writelines(message)
-                            f.writelines("\n")
-                            print(message)
-    f.close()
+                            idrac_inventory["Storage Disks Information"][ii[0]] = ii[1]
 
 
 def get_backplane_information():
-    f = open("hw_inventory.txt", "a")
     response = requests.get(
         "https://%s/redfish/v1/Chassis" % (idrac_ip),
         verify=False,
@@ -651,10 +579,8 @@ def get_backplane_information():
     if response.status_code != 200:
         print("\n- FAIL, get command failed, error is: %s" % data)
         sys.exit()
-    message = "\n---- Backplane Information ----"
-    f.writelines(message)
-    f.writelines("\n")
-    print(message)
+    # message = "\n---- Backplane Information ----"
+    # print(message)
     backplane_URI_list = []
     for i in data["Members"]:
         backplane = i["@odata.id"]
@@ -662,8 +588,6 @@ def get_backplane_information():
             backplane_URI_list.append(backplane)
     if backplane_URI_list == []:
         message = "- WARNING, no backplane information detected for system\n"
-        f.writelines(message)
-        f.writelines("\n")
         print(message)
         sys.exit()
     for i in backplane_URI_list:
@@ -673,10 +597,8 @@ def get_backplane_information():
             auth=(idrac_username, idrac_password),
         )
         data = response.json()
-        message = "\n- Detailed backplane information for %s -\n" % i.split("/")[-1]
-        f.writelines(message)
-        f.writelines("\n")
-        print(message)
+        # message = "\n- Detailed backplane information for %s -\n" % i.split("/")[-1]
+        # print(message)
         for iii in data.items():
             if (
                 iii[0] == "@odata.id"
@@ -690,16 +612,31 @@ def get_backplane_information():
                 or iii[0] == "PCIeDevices"
             ):
                 pass
+            elif iii[0] == "Oem":
+                try:
+                    idrac_inventory["Backplane Information"]["Oem"] = {}
+                    idrac_inventory["Backplane Information"]["Oem"]["Dell"] = {}
+                    idrac_inventory["Backplane Information"]["Oem"]["Dell"][
+                        "DellEnclosure"
+                    ] = {}
+                    for iiii in iii[1]["Dell"]["DellEnclosure"].items():
+                        if (
+                            iiii[0] == "@odata.context"
+                            or iiii[0] == "@odata.type"
+                            or iiii[0] == "@odata.id"
+                        ):
+                            pass
+                        else:
+                            idrac_inventory["Backplane Information"]["Oem"]["Dell"][
+                                "DellEnclosure"
+                            ][iiii[0]] = iiii[1]
+                except:
+                    pass
             else:
-                message = "%s: %s" % (iii[0], iii[1])
-                f.writelines(message)
-                f.writelines("\n")
-                print(message)
-    f.close()
+                idrac_inventory["Backplane Information"][iii[0]] = iii[1]
 
 
 def get_network_information():
-    f = open("hw_inventory.txt", "a")
     response = requests.get(
         "https://%s/redfish/v1/Systems/System.Embedded.1/NetworkInterfaces" % idrac_ip,
         verify=False,
@@ -709,24 +646,18 @@ def get_network_information():
     if response.status_code != 200:
         print("\n- FAIL, get command failed, error is: %s" % data)
         sys.exit()
-    message = "\n---- Network Device Information ----"
-    f.writelines(message)
-    f.writelines("\n")
-    print(message)
+    # message = "\n---- Network Device Information ----"
+    # print(message)
     network_URI_list = []
     for i in data["Members"]:
         network = i["@odata.id"]
         network_URI_list.append(network)
     if network_URI_list == []:
         message = "\n- WARNING, no network information detected for system\n"
-        f.writelines(message)
-        f.writelines("\n")
         print(message)
     for i in network_URI_list:
-        message = "\n- Network device details for %s -\n" % i.split("/")[-1]
-        f.writelines(message)
-        f.writelines("\n")
-        print(message)
+        # message = "\n- Network device details for %s -\n" % i.split("/")[-1]
+        # print(message)
         i = i.replace("Interfaces", "Adapters")
         response = requests.get(
             "https://%s%s" % (idrac_ip, i),
@@ -762,23 +693,19 @@ def get_network_information():
                 or ii[0] == "@odata.type"
                 or ii[0] == "NetworkDeviceFunctions"
                 or ii[0] == "NetworkPorts"
+                or ii[0] == "Assembly"
             ):
                 pass
             elif ii[0] == "Controllers":
-                mesage = ii[1][0]["ControllerCapabilities"]
-                f.writelines(message)
-                print(message)
-                message = (
-                    "FirmwarePackageVersion: %s" % ii[1][0]["FirmwarePackageVersion"]
-                )
-                f.writelines(message)
-                f.writelines("\n")
-                print(message)
+                idrac_inventory["Network Device Information"][
+                    "Controller Capabilities"
+                ] = ii[1][0]["ControllerCapabilities"]
+                idrac_inventory["Network Device Information"][
+                    "FirmwarePackageVersion"
+                ] = ii[1][0]["FirmwarePackageVersion"]
             else:
-                message = "%s: %s" % (ii[0], ii[1])
-                f.writelines(message)
-                f.writelines("\n")
-                print(message)
+                idrac_inventory["Network Device Information"][ii[0]] = ii[1]
+
         for z in port_uri_list:
             response = requests.get(
                 "https://%s%s" % (idrac_ip, z),
@@ -790,10 +717,8 @@ def get_network_information():
                 print("\n- FAIL, get command failed, error is: %s" % data)
                 sys.exit()
             else:
-                message = "\n- Network port details for %s -\n" % z.split("/")[-1]
-                f.writelines(message)
-                f.writelines("\n")
-                print(message)
+                # message = "\n- Network port details for %s -\n" % z.split("/")[-1]
+                # print(message)
                 for ii in data.items():
                     if (
                         ii[0] == "@odata.id"
@@ -812,18 +737,13 @@ def get_network_information():
                                 ):
                                     pass
                                 else:
-                                    message = "%s: %s" % (iii[0], iii[1])
-                                    f.writelines(message)
-                                    f.writelines("\n")
-                                    print(message)
+                                    idrac_inventory["Network Device Information"][
+                                        iii[0]
+                                    ] = iii[1]
                         except:
                             pass
                     else:
-                        message = "%s: %s" % (ii[0], ii[1])
-                        f.writelines(message)
-                        f.writelines("\n")
-                        print(message)
-    f.close()
+                        idrac_inventory["Network Device Information"][ii[0]] = ii[1]
 
 
 if __name__ == "__main__":
@@ -848,13 +768,16 @@ if __name__ == "__main__":
         get_system_information()
         get_memory_information()
         get_cpu_information()
-        get_fan_information()
+        # get_fan_information()
         get_ps_information()
         get_storage_controller_information()
         get_storage_disks_information()
         get_backplane_information()
         get_network_information()
+
+    with open("hw_inventory.json", "w") as write_file:
+        json.dump(idrac_inventory, write_file, indent=2)
     print(
-        '\n- WARNING, output also captured in "%s\hw_inventory.txt" file' % os.getcwd()
+        '\n- WARNING, output also captured in "%s\hw_inventory.json" file' % os.getcwd()
     )
 
