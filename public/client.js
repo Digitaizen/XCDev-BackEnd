@@ -4,6 +4,7 @@ console.log("Client side code running");
 const fetchButton = document.querySelector(".buttonFetch");
 const readButton = document.querySelector(".buttonRead");
 const scanButton = document.querySelector(".btnRunIPScan");
+const hwInventoryButton = document.querySelector(".buttonHwInventory");
 
 // Function to display result of a query in the browser window
 function displayResult(result) {
@@ -12,6 +13,22 @@ function displayResult(result) {
   node.appendChild(textNode);
   document.getElementById("serverList").appendChild(node);
 }
+
+hwInventoryButton.addEventListener("click", () => {
+  fetch("/hardwareInventoryToDb", {
+    method: "POST",
+  })
+    .then((response) => response.json())
+    .then((response) => {
+      if (response.success) {
+        console.log(response.message);
+      } else {
+        resultMsg =
+          "Hardware inventory request failed. Details: " + response.message;
+        throw new Error(resultMsg);
+      }
+    });
+});
 
 // Set logic for each of the buttons //////////////////////////////////////////
 scanButton.addEventListener("click", () => {
@@ -23,10 +40,10 @@ scanButton.addEventListener("click", () => {
   );
 
   fetch("/findServers", {
-    method: "POST"
+    method: "POST",
   })
-    .then(response => response.json())
-    .then(response => {
+    .then((response) => response.json())
+    .then((response) => {
       console.log("Back from API call, response.status is:", response.status);
       if (response.status) {
         console.log("Now updating the database..");
@@ -41,7 +58,7 @@ scanButton.addEventListener("click", () => {
         throw new Error(resultMsg);
       }
     })
-    .catch(error => {
+    .catch((error) => {
       console.log(error);
       // Output results of the request to the browser window
       displayResult(error);
@@ -53,16 +70,16 @@ fetchButton.addEventListener("click", () => {
   console.log("Fetch button clicked");
 
   fetch("/postServers", {
-    method: "POST"
+    method: "POST",
   })
-    .then(response => {
+    .then((response) => {
       if (response.ok) {
         console.log("server data added");
         return;
       }
       throw new Error("Request Failed");
     })
-    .catch(error => {
+    .catch((error) => {
       console.log(error);
     });
 });
@@ -71,17 +88,17 @@ readButton.addEventListener("click", () => {
   console.log("Read button clicked");
 
   fetch("/getServers", {
-    method: "GET"
+    method: "GET",
   })
-    .then(response => {
+    .then((response) => {
       if (response.ok) {
         console.log("server data retrieved");
         return response.json();
       }
       throw new Error("Request Failed");
     })
-    .then(data => {
-      data.map(item => {
+    .then((data) => {
+      data.map((item) => {
         var node = document.createElement("LI");
         var textNode = document.createTextNode(
           String(
@@ -92,7 +109,7 @@ readButton.addEventListener("click", () => {
         document.getElementById("serverList").appendChild(node);
       });
     })
-    .catch(error => {
+    .catch((error) => {
       console.log(error);
     });
 });

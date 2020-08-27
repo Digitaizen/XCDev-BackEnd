@@ -971,5 +971,91 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
           );
         });
     });
+
+    // **Component Inventory API Endpoint START**
+    app.post("/hardwareInventoryToDb", (req, res) => {
+      let hw_payload_values = fs
+        .readFileSync("bmr_payload_values.txt")
+        .toString()
+        .replace(/\r/g, "")
+        .split("\n");
+      let idrac_username = hw_payload_values[5];
+      let idrac_password = hw_payload_values[6];
+      // if (ip_arr !== "" && idrac_username !== "" && idrac_password !== "") {
+      if (idrac_username !== "" && idrac_password !== "") {
+        const hwInventoryScript = exec(
+          `python get_iDRAC_Inventory.py -ip 100.80.144.152 -u ${idrac_username} -p ${idrac_password} -s y`
+        );
+        hwInventoryScript.stdout.on("data", (data) => {
+          let resultData = JSON.parse(data);
+          console.log("FINISHED CONVERTING JSON TO JS OBJECT");
+          console.log(resultData.systemInformation.SKU);
+          // console.log(JSON.parse(data));
+          // console.log(JSON.parse(data));
+
+          _db
+            .collection("componentInventory")
+            .findOne(
+              { serviceTag: resultData.systemInformation.SKU },
+              (err, results) => {
+                if (err) {
+                  return console.log(err);
+                }
+                // If an entry with the same service tag is found, update the entry
+                if (results !== null) {
+                  _db.collection("componentInventory").updateOne(
+                    { serviceTag: resultData.systemInformation.SKU },
+                    {
+                      $set: {
+                        data: resultData,
+                      },
+                    },
+                    (err) => {
+                      if (err) {
+                        return console.log(err);
+                      }
+                    }
+                  );
+
+                  // If no entry with the same service tag is found, add a new entry
+                } else {
+                  if (!err) {
+                    _db.collection("componentInventory").insertOne(
+                      {
+                        serviceTag: resultData.systemInformation.SKU,
+                        data: resultData,
+                      },
+                      { checkKeys: false },
+                      (err, res) => {
+                        if (err) {
+                          return console.log(err);
+                        }
+                      }
+                    );
+                  }
+                }
+              }
+            );
+
+          // res.status(200).json({
+          //   success: true,
+          //   message: "Hw inventory complete",
+          //   results: data,
+          // });
+          // resolve({
+          //   success: true,
+          //   message: `Inventory Completed for server 100.80.144.152 with data: ${data}`,
+          // });
+        });
+        hwInventoryScript.stderr.on("data", (data) => {
+          console.error(data);
+          // reject({
+          //   success: false,
+          //   message: data,
+          // });
+        });
+      }
+    });
+    // **Component Inventory API Endpoint END**
   }
 );

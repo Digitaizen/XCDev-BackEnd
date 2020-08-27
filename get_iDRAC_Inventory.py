@@ -18,7 +18,14 @@
 #
 
 
-import requests, json, sys, re, time, warnings, argparse, os
+import requests
+import json
+import sys
+import re
+import time
+import warnings
+import argparse
+import os
 
 from datetime import datetime
 
@@ -33,10 +40,10 @@ parser.add_argument("-p", help="iDRAC password", required=True)
 parser.add_argument(
     "script_examples",
     action="store_true",
-    help="GetSystemHWInventoryREDFISH.py -ip 192.168.0.120 -u root -p calvin -m y, this example will get only memory information. GetSystemHWInventoryREDFISH.py -ip 192.168.0.120 -u root -p calvin -c y -m y, this example will get only processor and memory information. GetSystemHWInventoryREDFISH.py -ip 192.168.0.120 -u root -p calvin -a y, this example will get all system information: general system information, processor, memory, fans, power supplies, hard drives, storage controllers, network devices",
+    help="GetSystemHWInventoryREDFISH.py -ip 192.168.0.120 -u root -p calvin -m y, this example will get only memory information. GetSystemHWInventoryREDFISH.py -ip 192.168.0.120 -u root -p calvin -c y -m y, this example will get only processor and memory information. GetSystemHWInventoryREDFISH.py -ip 192.168.0.120 -u root -p calvin -a y, this example will get all systemInformation: general systemInformation, processor, memory, fans, power supplies, hard drives, storage controllers, network devices",
 )
 parser.add_argument(
-    "-s", help='Get system information only, pass in "y"', required=False
+    "-s", help='Get systemInformation only, pass in "y"', required=False
 )
 parser.add_argument(
     "-m", help='Get memory information only, pass in "y"', required=False
@@ -44,7 +51,8 @@ parser.add_argument(
 parser.add_argument(
     "-c", help='Get processor information only, pass in "y"', required=False
 )
-parser.add_argument("-f", help='Get fan information only, pass in "y"', required=False)
+parser.add_argument(
+    "-f", help='Get fan information only, pass in "y"', required=False)
 parser.add_argument(
     "-ps", help='Get power supply information only, pass in "y"', required=False
 )
@@ -56,7 +64,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "-a",
-    help='Get all system information / device information, pass in "y"',
+    help='Get all systemInformation / device information, pass in "y"',
     required=False,
 )
 
@@ -68,7 +76,7 @@ idrac_username = args["u"]
 idrac_password = args["p"]
 
 idrac_inventory = {
-    "System Information": {},
+    "systemInformation": {},
     "Memory Information": {},
     "CPU Information": {},
     "Storage Controller Information": {},
@@ -125,7 +133,7 @@ def get_system_information():
         print("\n- FAIL, get command failed, error is: %s" % data)
         sys.exit()
     else:
-        # message = "\n---- System Information ----"
+        # message = "\n---- systemInformation ----"
         # print(message)
         # Grab the whole returned json data and dump it into a json file
         # with open("hw_inventory.json", "w") as write_file:
@@ -153,9 +161,10 @@ def get_system_information():
             ):
                 pass
             elif i[0] == "Oem":
-                idrac_inventory["System Information"]["Oem"] = {}
-                idrac_inventory["System Information"]["Oem"]["Dell"] = {}
-                idrac_inventory["System Information"]["Oem"]["Dell"]["DellSystem"] = {}
+                idrac_inventory["systemInformation"]["Oem"] = {}
+                idrac_inventory["systemInformation"]["Oem"]["Dell"] = {}
+                idrac_inventory["systemInformation"]["Oem"]["Dell"]["DellSystem"] = {
+                }
                 for ii in i[1]["Dell"]["DellSystem"].items():
                     if (
                         "@odata"
@@ -166,19 +175,17 @@ def get_system_information():
                     ):
                         pass
                     else:
-                        idrac_inventory["System Information"]["Oem"]["Dell"][
+                        idrac_inventory["systemInformation"]["Oem"]["Dell"][
                             "DellSystem"
                         ][ii[0]] = ii[1]
 
-            elif i[0] == "Boot":
-                try:
-                    idrac_inventory["System Information"]["BiosBootMode"] = [i[1]][
-                        "BootSourceOverrideMode"
-                    ]
-                except:
-                    pass
+            # elif i[0] == 'Boot':
+            #     try:
+            #         idrac_inventory["systemInformation"]["BiosBootMode"] = i[1]['BootSourceOverrideMode']
+            #     except:
+            #         pass
             else:
-                idrac_inventory["System Information"][i[0]] = i[1]
+                idrac_inventory["systemInformation"][i[0]] = i[1]
 
 
 def get_memory_information():
@@ -226,7 +233,8 @@ def get_memory_information():
                     pass
                 elif ii[0] == "Oem":
                     idrac_inventory["Memory Information"][dimm_slot]["Oem"] = {}
-                    idrac_inventory["Memory Information"][dimm_slot]["Oem"]["Dell"] = {}
+                    idrac_inventory["Memory Information"][dimm_slot]["Oem"]["Dell"] = {
+                    }
                     idrac_inventory["Memory Information"][dimm_slot]["Oem"]["Dell"][
                         "DellMemory"
                     ] = {}
@@ -551,7 +559,8 @@ def get_storage_disks_information():
             print("- FAIL, GET command failed, detailed error information: %s" % data)
             sys.exit()
         if data["Drives"] == []:
-            message = "\n- WARNING, no drives detected for %s" % i.split("/")[-1]
+            message = "\n- WARNING, no drives detected for %s" % i.split(
+                "/")[-1]
             print(message)
         else:
             for i in data["Drives"]:
@@ -788,9 +797,9 @@ if __name__ == "__main__":
         get_backplane_information()
         get_network_information()
 
-    with open("hw_inventory.json", "w") as write_file:
-        json.dump(idrac_inventory, write_file, indent=2)
-    print(
-        '\n- WARNING, output also captured in "%s\hw_inventory.json" file' % os.getcwd()
-    )
-
+    # with open("hw_inventory.json", "w") as write_file:
+    #     json.dump(idrac_inventory, write_file, indent=2)
+    # print(
+    #     '\n- WARNING, output also captured in "%s\hw_inventory.json" file' % os.getcwd()
+    # )
+print(json.dumps(idrac_inventory))
