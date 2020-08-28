@@ -604,20 +604,20 @@ def get_storage_controller_information():
                         "Oem"
                     ] = {}
                     idrac_inventory["StorageControllerInformation"][storage_controller][
-                        "Dell"
-                    ] = {}
+                        "Oem"
+                    ]["Dell"] = {}
                     idrac_inventory["StorageControllerInformation"][storage_controller][
-                        "Dell"
-                    ]["DellController"] = {}
+                        "Oem"
+                    ]["Dell"]["DellController"] = {}
                     for ii in i[1]["Dell"]["DellController"].items():
                         idrac_inventory["StorageControllerInformation"][
                             storage_controller
-                        ]["Dell"]["DellController"][ii[0]] = ii[1]
+                        ]["Oem"]["Dell"]["DellController"][ii[0]] = ii[1]
                 except:
                     for ii in i[1]["Dell"].items():
                         idrac_inventory["StorageControllerInformation"][
                             storage_controller
-                        ]["Dell"][ii[0]] = ii[1]
+                        ]["Oem"]["Dell"][ii[0]] = ii[1]
             else:
                 idrac_inventory["StorageControllerInformation"][storage_controller][
                     i[0]
@@ -922,7 +922,7 @@ if __name__ == "__main__":
         get_system_information()
         get_memory_information()
         get_cpu_information()
-        get_fan_information()
+        # get_fan_information()
         get_ps_information()
         get_storage_controller_information()
         get_storage_disks_information()
