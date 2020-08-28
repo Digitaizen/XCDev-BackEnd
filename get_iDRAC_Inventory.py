@@ -153,24 +153,24 @@ def get_system_information():
                 or i[0] == "PCIeFunctions"
             ):
                 pass
-            elif i[0] == "Oem":
-                idrac_inventory["SystemInformation"]["Oem"] = {}
-                idrac_inventory["SystemInformation"]["Oem"]["Dell"] = {}
-                idrac_inventory["SystemInformation"]["Oem"]["Dell"]["DellSystem"] = {
-                }
-                for ii in i[1]["Dell"]["DellSystem"].items():
-                    if (
-                        # "@odata"
-                        # in ii[0]
-                        ii[0] == "@odata.context"
-                        or ii[0] == "@odata.type"
-                        or ii[0] == "@odata.id"
-                    ):
-                        pass
-                    else:
-                        idrac_inventory["SystemInformation"]["Oem"]["Dell"][
-                            "DellSystem"
-                        ][ii[0]] = ii[1]
+            # elif i[0] == "Oem":
+            #     idrac_inventory["SystemInformation"]["Oem"] = {}
+            #     idrac_inventory["SystemInformation"]["Oem"]["Dell"] = {}
+            #     idrac_inventory["SystemInformation"]["Oem"]["Dell"]["DellSystem"] = {
+            #     }
+            #     for ii in i[1]["Dell"]["DellSystem"].items():
+            #         if (
+            #             # "@odata"
+            #             # in ii[0]
+            #             ii[0] == "@odata.context"
+            #             or ii[0] == "@odata.type"
+            #             or ii[0] == "@odata.id"
+            #         ):
+            #             pass
+            #         else:
+            #             idrac_inventory["SystemInformation"]["Oem"]["Dell"][
+            #                 "DellSystem"
+            #             ][ii[0]] = ii[1]
 
             # elif i[0] == "Boot":
             #     try:
@@ -193,59 +193,100 @@ def get_memory_information():
         auth=(idrac_username, idrac_password),
     )
     data = response.json()
-    if response.status_code != 200:
-        print("\n- FAIL, get command failed, error is: %s" % data)
-        sys.exit()
-    # else:
-    #     message = "\n---- Memory Information ----"
-    #     print(message)
+    # print(data)
+
     for i in data["Members"]:
         dimm = i["@odata.id"].split("/")[-1]
-        try:
-            dimm_slot = re.search("DIMM.+", dimm).group()
-        except:
-            print("\n- FAIL, unable to get dimm slot info")
-            sys.exit()
+        # print(dimm)
+        dimm_slot = re.search("DIMM.+", dimm).group()
+        # print(dimm_slot)
         response = requests.get(
             "https://%s%s" % (idrac_ip, i["@odata.id"]),
             verify=False,
             auth=(idrac_username, idrac_password),
         )
         sub_data = response.json()
-        if response.status_code != 200:
-            print("\n- FAIL, get command failed, error is: %s" % sub_data)
-            sys.exit()
-        else:
-            idrac_inventory["MemoryInformation"][dimm_slot] = {}
-            # message = "\n- Memory details for %s -\n" % dimm_slot
-            # print(message)
-            for ii in sub_data.items():
-                if (
-                    # "@odata" in ii[0]
-                    ii[0] == "@odata.id"
-                    or ii[0] == "@odata.context"
-                    or ii[0] == "Assembly"
-                    or ii[0] == "Metrics"
-                    or ii[0] == "Links"
-                ):
-                    pass
-                elif ii[0] == "Oem":
-                    idrac_inventory["MemoryInformation"][dimm_slot]["Oem"] = {}
-                    idrac_inventory["MemoryInformation"][dimm_slot]["Oem"]["Dell"] = {
-                    }
-                    idrac_inventory["MemoryInformation"][dimm_slot]["Oem"]["Dell"][
-                        "DellMemory"
-                    ] = {}
-                    for iii in ii[1]["Dell"]["DellMemory"].items():
-                        if iii[0] == "@odata.context" or iii[0] == "@odata.type":
-                            # if "@odata" in iii[0]:
-                            pass
-                        else:
-                            idrac_inventory["MemoryInformation"][dimm_slot]["Oem"][
-                                "Dell"
-                            ]["DellMemory"][iii[0]] = iii[1]
-                else:
-                    idrac_inventory["MemoryInformation"][dimm_slot][ii[0]] = ii[1]
+        # print(sub_data)
+        idrac_inventory["MemoryInformation"][dimm_slot] = {}
+        # message = "\n- Memory details for %s -\n" % dimm_slot
+        # print(message)
+        for ii in sub_data.items():
+            # print(ii)
+            if (
+                "@odata" in ii[0]
+                # ii[0] == "@odata.id"
+                # or ii[0] == "@odata.context"
+                or ii[0] == "Assembly"
+                or ii[0] == "Metrics"
+                or ii[0] == "Links"
+            ):
+                pass
+            else:
+                # idrac_inventory["MemoryInformation"][dimm_slot][ii[0]] = ii[1]
+                idrac_inventory["MemoryInformation"][dimm_slot][ii[0]] = ii[1]
+# def get_memory_information():
+#     response = requests.get(
+#         "https://%s/redfish/v1/Systems/System.Embedded.1/Memory" % idrac_ip,
+#         verify=False,
+#         auth=(idrac_username, idrac_password),
+#     )
+#     data = response.json()
+#     if response.status_code != 200:
+#         # print("\n- FAIL, get command failed, error is: %s" % data)
+#         # sys.exit()
+#         pass
+#     # else:
+#     #     message = "\n---- Memory Information ----"
+#     #     print(message)
+#     for i in data["Members"]:
+#         dimm = i["@odata.id"].split("/")[-1]
+#         try:
+#             dimm_slot = re.search("DIMM.+", dimm).group()
+#         except:
+#             # print("\n- FAIL, unable to get dimm slot info")
+#             # sys.exit()
+#             pass
+#         response = requests.get(
+#             "https://%s%s" % (idrac_ip, i["@odata.id"]),
+#             verify=False,
+#             auth=(idrac_username, idrac_password),
+#         )
+#         sub_data = response.json()
+#         if response.status_code != 200:
+#             # print("\n- FAIL, get command failed, error is: %s" % sub_data)
+#             # sys.exit()
+#             pass
+#         else:
+#             idrac_inventory["MemoryInformation"][dimm_slot] = {}
+#             # message = "\n- Memory details for %s -\n" % dimm_slot
+#             # print(message)
+#             for ii in sub_data.items():
+#                 if (
+#                     "@odata" in ii[0]
+#                     # ii[0] == "@odata.id"
+#                     # or ii[0] == "@odata.context"
+#                     or ii[0] == "Assembly"
+#                     or ii[0] == "Metrics"
+#                     or ii[0] == "Links"
+#                 ):
+#                     pass
+#                 # elif ii[0] == "Oem":
+#                 #     idrac_inventory["MemoryInformation"][dimm_slot]["Oem"] = {}
+#                 #     idrac_inventory["MemoryInformation"][dimm_slot]["Oem"]["Dell"] = {
+#                 #     }
+#                 #     idrac_inventory["MemoryInformation"][dimm_slot]["Oem"]["Dell"][
+#                 #         "DellMemory"
+#                 #     ] = {}
+#                 #     for iii in ii[1]["Dell"]["DellMemory"].items():
+#                 #         if iii[0] == "@odata.context" or iii[0] == "@odata.type":
+#                 #             # if "@odata" in iii[0]:
+#                 #             pass
+#                 #         else:
+#                 #             idrac_inventory["MemoryInformation"][dimm_slot]["Oem"][
+#                 #                 "Dell"
+#                 #             ]["DellMemory"][iii[0]] = iii[1]
+#                 else:
+#                     idrac_inventory["MemoryInformation"][dimm_slot][ii[0]] = ii[1]
 
 
 def get_cpu_information():
@@ -655,9 +696,10 @@ def get_storage_disks_information():
             print("- FAIL, GET command failed, detailed error information: %s" % data)
             sys.exit()
         if data["Drives"] == []:
-            message = "\n- WARNING, no drives detected for %s" % i.split(
-                "/")[-1]
-            print(message)
+            pass
+            # message = "\n- WARNING, no drives detected for %s" % i.split(
+            #     "/")[-1]
+            # print(message)
         else:
             for i in data["Drives"]:
                 for ii in i.items():
@@ -910,7 +952,8 @@ def get_network_information():
 
 def save_to_json():
     with open(file_name, "w") as write_file:
-        json.dump(idrac_inventory, write_file, indent=2)
+        # json.dump(idrac_inventory, write_file, indent=2)
+        json.dump(idrac_inventory["MemoryInformation"], write_file, indent=2)
     print('\n- WARNING, output captured in "%s\%s" file' %
           (os.getcwd(), file_name))
 
@@ -919,7 +962,7 @@ if __name__ == "__main__":
     check_supported_idrac_version()
     if args["s"]:
         get_system_information()
-    if args["m"]:
+    if args["m"]:  # NOT WORKING
         get_memory_information()
     if args["c"]:
         get_cpu_information()
@@ -943,9 +986,10 @@ if __name__ == "__main__":
         get_storage_disks_information()
         get_backplane_information()
         get_network_information()
-    if args["d"]:
-        save_to_json()
-    if args["pj"]:
-        print(json.dumps(idrac_inventory, indent=2))
-    else:
-        print(json.dumps(idrac_inventory))  # default
+    # if args["d"]:
+    #     save_to_json()
+    # if args["pj"]:
+    #     print(json.dumps(idrac_inventory, indent=2))
+    # else:
+    #     # print(json.dumps(idrac_inventory["MemoryInformation"]))  # default
+print(idrac_inventory["MemoryInformation"])  # default
