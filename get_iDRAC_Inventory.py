@@ -67,35 +67,23 @@ idrac_ip = args["ip"]
 idrac_username = args["u"]
 idrac_password = args["p"]
 
+file_name = "hw_inventory_%s.json" % idrac_ip
+
 idrac_inventory = {
-    "System Information": {},
-    "Memory Information": {},
-    "CPU Information": {},
-    "Storage Controller Information": {},
-    "Storage Disks Information": {},
-    "Network Device Information": {},
-    "Power Supply Information": {},
-    "Backplane Information": {},
+    "SystemInformation": {},
+    "MemoryInformation": {},
+    "ProcessorInformation": {},
+    "StorageControllerInformation": {},
+    "StorageDisksInformation": {},
+    "NetworkDeviceInformation": {},
+    "PowerSupplyInformation": {},
+    "BackplaneInformation": {},
 }
 
 try:
-    os.remove("hw_inventory.json")
+    os.remove(file_name)
 except:
     pass
-
-
-# f = open("hw_inventory.txt", "a")
-# d = datetime.now()
-# current_date_time = "- Data collection timestamp: %s-%s-%s  %s:%s:%s\n" % (
-#     d.month,
-#     d.day,
-#     d.year,
-#     d.hour,
-#     d.minute,
-#     d.second,
-# )
-# f.writelines(current_date_time)
-# f.close()
 
 
 def check_supported_idrac_version():
@@ -127,18 +115,14 @@ def get_system_information():
     else:
         # message = "\n---- System Information ----"
         # print(message)
-        # Grab the whole returned json data and dump it into a json file
-        # with open("hw_inventory.json", "w") as write_file:
-        #     json.dump(data, write_file, indent=2)
-
         for i in data.items():
             if (
-                # i[0] == "@odata.id"
-                # or i[0] == "@odata.context"
-                "@odata" in i[0]
+                i[0] == "@odata.id"
+                or i[0] == "@odata.context"
+                # "@odata" in i[0]
                 or i[0] == "Links"
                 or i[0] == "Actions"
-                # or i[0] == "@odata.type"
+                or i[0] == "@odata.type"
                 or i[0] == "Description"
                 or i[0] == "EthernetInterfaces"
                 or i[0] == "Storage"
@@ -153,32 +137,35 @@ def get_system_information():
             ):
                 pass
             elif i[0] == "Oem":
-                idrac_inventory["System Information"]["Oem"] = {}
-                idrac_inventory["System Information"]["Oem"]["Dell"] = {}
-                idrac_inventory["System Information"]["Oem"]["Dell"]["DellSystem"] = {}
+                idrac_inventory["SystemInformation"]["Oem"] = {}
+                idrac_inventory["SystemInformation"]["Oem"]["Dell"] = {}
+                idrac_inventory["SystemInformation"]["Oem"]["Dell"]["DellSystem"] = {}
                 for ii in i[1]["Dell"]["DellSystem"].items():
                     if (
-                        "@odata"
-                        in ii[0]
-                        # ii[0] == "@odata.context"
-                        # or ii[0] == "@odata.type"
-                        # or ii[0] == "@odata.id"
+                        # "@odata"
+                        # in ii[0]
+                        ii[0] == "@odata.context"
+                        or ii[0] == "@odata.type"
+                        or ii[0] == "@odata.id"
                     ):
                         pass
                     else:
-                        idrac_inventory["System Information"]["Oem"]["Dell"][
+                        idrac_inventory["SystemInformation"]["Oem"]["Dell"][
                             "DellSystem"
                         ][ii[0]] = ii[1]
 
-            elif i[0] == "Boot":
-                try:
-                    idrac_inventory["System Information"]["BiosBootMode"] = [i[1]][
-                        "BootSourceOverrideMode"
-                    ]
-                except:
-                    pass
+            # elif i[0] == "Boot":
+            #     try:
+            #         idrac_inventory["SystemInformation"]["Boot"] = {}
+            #         idrac_inventory["SystemInformation"]["Boot"]["BiosBootMode"] = {}
+            #         idrac_inventory["SystemInformation"]["Boot"]["BiosBootMode"] = [
+            #             i[1]
+            #         ]["BootSourceOverrideMode"]
+            #     except:
+            #         pass
+
             else:
-                idrac_inventory["System Information"][i[0]] = i[1]
+                idrac_inventory["SystemInformation"][i[0]] = i[1]
 
 
 def get_memory_information():
@@ -198,7 +185,6 @@ def get_memory_information():
         dimm = i["@odata.id"].split("/")[-1]
         try:
             dimm_slot = re.search("DIMM.+", dimm).group()
-            idrac_inventory["Memory Information"][dimm_slot] = {}
         except:
             print("\n- FAIL, unable to get dimm slot info")
             sys.exit()
@@ -212,34 +198,35 @@ def get_memory_information():
             print("\n- FAIL, get command failed, error is: %s" % sub_data)
             sys.exit()
         else:
+            idrac_inventory["MemoryInformation"][dimm_slot] = {}
             # message = "\n- Memory details for %s -\n" % dimm_slot
             # print(message)
             for ii in sub_data.items():
                 if (
-                    "@odata" in ii[0]
-                    # ii[0] == "@odata.id"
-                    # or ii[0] == "@odata.context"
+                    # "@odata" in ii[0]
+                    ii[0] == "@odata.id"
+                    or ii[0] == "@odata.context"
                     or ii[0] == "Assembly"
                     or ii[0] == "Metrics"
                     or ii[0] == "Links"
                 ):
                     pass
                 elif ii[0] == "Oem":
-                    idrac_inventory["Memory Information"][dimm_slot]["Oem"] = {}
-                    idrac_inventory["Memory Information"][dimm_slot]["Oem"]["Dell"] = {}
-                    idrac_inventory["Memory Information"][dimm_slot]["Oem"]["Dell"][
+                    idrac_inventory["MemoryInformation"][dimm_slot]["Oem"] = {}
+                    idrac_inventory["MemoryInformation"][dimm_slot]["Oem"]["Dell"] = {}
+                    idrac_inventory["MemoryInformation"][dimm_slot]["Oem"]["Dell"][
                         "DellMemory"
                     ] = {}
                     for iii in ii[1]["Dell"]["DellMemory"].items():
-                        # if iii[0] == "@odata.context" or iii[0] == "@odata.type":
-                        if "@odata" in iii[0]:
+                        if iii[0] == "@odata.context" or iii[0] == "@odata.type":
+                            # if "@odata" in iii[0]:
                             pass
                         else:
-                            idrac_inventory["Memory Information"][dimm_slot]["Oem"][
+                            idrac_inventory["MemoryInformation"][dimm_slot]["Oem"][
                                 "Dell"
                             ]["DellMemory"][iii[0]] = iii[1]
                 else:
-                    idrac_inventory["Memory Information"][dimm_slot][ii[0]] = ii[1]
+                    idrac_inventory["MemoryInformation"][dimm_slot][ii[0]] = ii[1]
 
 
 def get_cpu_information():
@@ -265,27 +252,35 @@ def get_cpu_information():
             print("\n- FAIL, get command failed, error is: %s" % sub_data)
             sys.exit()
         else:
+            idrac_inventory["ProcessorInformation"][cpu] = {}
             for ii in sub_data.items():
                 if (
-                    "@odata" in ii[0]
-                    # ii[0] == "@odata.id"
-                    # or ii[0] == "@odata.context"
+                    # "@odata" in ii[0]
+                    ii[0] == "@odata.id"
+                    or ii[0] == "@odata.context"
                     or ii[0] == "Metrics"
                     or ii[0] == "Links"
                     or ii[0] == "Description"
                     or ii[0] == "Assembly"
-                    # or ii[0] == "@odata.type"
+                    or ii[0] == "@odata.type"
                 ):
                     pass
                 elif ii[0] == "Oem":
+                    idrac_inventory["ProcessorInformation"][cpu]["Oem"] = {}
+                    idrac_inventory["ProcessorInformation"][cpu]["Oem"]["Dell"] = {}
+                    idrac_inventory["ProcessorInformation"][cpu]["Oem"]["Dell"][
+                        "DellProcessor"
+                    ] = {}
                     for iii in ii[1]["Dell"]["DellProcessor"].items():
-                        if "@odata" in iii[0]:
-                            # if iii[0] == "@odata.context" or iii[0] == "@odata.type":
+                        # if "@odata" in iii[0]:
+                        if iii[0] == "@odata.context" or iii[0] == "@odata.type":
                             pass
                         else:
-                            idrac_inventory["CPU Information"][iii[0]] = iii[1]
+                            idrac_inventory["ProcessorInformation"][cpu]["Oem"]["Dell"][
+                                "DellProcessor"
+                            ][iii[0]] = iii[1]
                 else:
-                    idrac_inventory["CPU Information"][ii[0]] = ii[1]
+                    idrac_inventory["ProcessorInformation"][cpu][ii[0]] = ii[1]
 
 
 def get_fan_information():
@@ -362,7 +357,6 @@ def get_fan_information():
 
 
 def get_ps_information():
-    f = open("hw_inventory.txt", "a")
     response = requests.get(
         "https://%s/redfish/v1/Systems/System.Embedded.1" % idrac_ip,
         verify=False,
@@ -392,24 +386,43 @@ def get_ps_information():
                 else:
                     data_get = response.json()
                     if "PowerSupplies" not in data_get.keys():
+                        ps_name = data_get["Name"].replace(" ", "")
+                        idrac_inventory["PowerSupplyInformation"][ps_name] = {}
                         # message = "\n- Details for %s -\n" % data_get["Name"]
                         # print(message)
                         for i in data_get.items():
                             if i[0] == "Oem":
                                 try:
+                                    idrac_inventory["PowerSupplyInformation"][ps_name][
+                                        "Oem"
+                                    ] = {}
+                                    idrac_inventory["PowerSupplyInformation"][ps_name][
+                                        "Oem"
+                                    ]["Dell"] = {}
+                                    idrac_inventory["PowerSupplyInformation"][ps_name][
+                                        "Oem"
+                                    ]["Dell"]["DellPowerSupply"] = {}
                                     for ii in i[1]["Dell"]["DellPowerSupply"].items():
-                                        idrac_inventory["Power Supply Information"][
-                                            ii[0]
-                                        ] = ii[1]
+                                        idrac_inventory["PowerSupplyInformation"][
+                                            ps_name
+                                        ]["Oem"]["Dell"]["DellPowerSupply"][ii[0]] = ii[
+                                            1
+                                        ]
                                 except:
                                     print(
                                         "- FAIL, unable to find Dell PowerSupply OEM information"
                                     )
                                     sys.exit()
                             else:
-                                idrac_inventory["Power Supply Information"][i[0]] = i[1]
+                                idrac_inventory["PowerSupplyInformation"][ps_name][
+                                    i[0]
+                                ] = i[1]
                     else:
                         if len(data["Links"]["PoweredBy"]) == 1:
+                            ps_name = data_get["PowerSupplies"][0]["Name"].replace(
+                                " ", ""
+                            )
+                            idrac_inventory["PowerSupplyInformation"][ps_name] = {}
                             # message = (
                             #     "\n- Details for %s -\n"
                             #     % data_get["PowerSupplies"][0]["Name"]
@@ -417,16 +430,44 @@ def get_ps_information():
                             # print(message)
                             for i in data_get.items():
                                 if i[0] == "PowerSupplies":
+                                    idrac_inventory["PowerSupplyInformation"][ps_name][
+                                        "PowerSupplies"
+                                    ] = {}
                                     for ii in i[1]:
                                         for iii in ii.items():
                                             if iii[0] == "Oem":
+                                                idrac_inventory[
+                                                    "PowerSupplyInformation"
+                                                ][ps_name]["PowerSupplies"]["Oem"] = {}
+                                                idrac_inventory[
+                                                    "PowerSupplyInformation"
+                                                ][ps_name]["PowerSupplies"]["Oem"][
+                                                    "Dell"
+                                                ] = {}
+                                                idrac_inventory[
+                                                    "PowerSupplyInformation"
+                                                ][ps_name]["PowerSupplies"]["Oem"][
+                                                    "Dell"
+                                                ][
+                                                    "DellPowerSupply"
+                                                ] = {}
                                                 try:
                                                     for iiii in iii[1]["Dell"][
                                                         "DellPowerSupply"
                                                     ].items():
                                                         idrac_inventory[
-                                                            "Power Supply Information"
-                                                        ][iiii[0]] = iiii[1]
+                                                            "PowerSupplyInformation"
+                                                        ][ps_name]["PowerSupplies"][
+                                                            "Oem"
+                                                        ][
+                                                            "Dell"
+                                                        ][
+                                                            "DellPowerSupply"
+                                                        ][
+                                                            iiii[0]
+                                                        ] = iiii[
+                                                            1
+                                                        ]
                                                 except:
                                                     print(
                                                         "- FAIL, unable to find Dell PowerSupply OEM information"
@@ -434,20 +475,31 @@ def get_ps_information():
                                                     sys.exit()
                                             else:
                                                 idrac_inventory[
-                                                    "Power Supply Information"
-                                                ][iii[0]] = iii[1]
+                                                    "PowerSupplyInformation"
+                                                ][ps_name]["PowerSupplies"][
+                                                    iii[0]
+                                                ] = iii[
+                                                    1
+                                                ]
                                 elif i[0] == "Voltages":
                                     pass
                                 elif i[0] == "PowerControl":
+                                    idrac_inventory["PowerSupplyInformation"][ps_name][
+                                        "PowerSupplies"
+                                    ]["PowerControl"] = {}
                                     for ii in i[1]:
                                         for iii in ii.items():
-                                            idrac_inventory["Power Supply Information"][
+                                            idrac_inventory["PowerSupplyInformation"][
+                                                ps_name
+                                            ]["PowerSupplies"]["PowerControl"][
                                                 iii[0]
-                                            ] = iii[1]
+                                            ] = iii[
+                                                1
+                                            ]
                                 else:
-                                    idrac_inventory["Power Supply Information"][
-                                        i[0]
-                                    ] = i[1]
+                                    idrac_inventory["PowerSupplyInformation"][ps_name][
+                                        "PowerSupplies"
+                                    ][i[0]] = i[1]
                         else:
                             for i in data_get.items():
                                 if i[0] == "PowerSupplies":
@@ -458,17 +510,38 @@ def get_ps_information():
                                     return
                                 else:
                                     for i in psu_ids:
+                                        ps_name = i["Name"].replace(" ", "")
+                                        idrac_inventory["PowerSupplyInformation"][
+                                            ps_name
+                                        ] = {}
                                         # message = "\n- Details for %s -\n" % i["Name"]
                                         # print(message)
                                         for ii in i.items():
                                             if ii[0] == "Oem":
                                                 try:
+                                                    idrac_inventory[
+                                                        "PowerSupplyInformation"
+                                                    ][ps_name]["Oem"] = {}
+                                                    idrac_inventory[
+                                                        "PowerSupplyInformation"
+                                                    ][ps_name]["Oem"]["Dell"] = {}
+                                                    idrac_inventory[
+                                                        "PowerSupplyInformation"
+                                                    ][ps_name]["Oem"]["Dell"][
+                                                        "DellPowerSupply"
+                                                    ] = {}
                                                     for iii in ii[1]["Dell"][
                                                         "DellPowerSupply"
                                                     ].items():
                                                         idrac_inventory[
-                                                            "Power Supply Information"
-                                                        ][iii[0]] = iii[1]
+                                                            "PowerSupplyInformation"
+                                                        ][ps_name]["Oem"]["Dell"][
+                                                            "DellPowerSupply"
+                                                        ][
+                                                            iii[0]
+                                                        ] = iii[
+                                                            1
+                                                        ]
                                                 except:
                                                     print(
                                                         "- FAIL, unable to find Dell PowerSupply OEM information"
@@ -476,8 +549,8 @@ def get_ps_information():
                                                     sys.exit()
                                             else:
                                                 idrac_inventory[
-                                                    "Power Supply Information"
-                                                ][ii[0]] = ii[1]
+                                                    "PowerSupplyInformation"
+                                                ][ps_name][ii[0]] = ii[1]
                                         count += 1
 
 
@@ -502,6 +575,8 @@ def get_storage_controller_information():
             auth=(idrac_username, idrac_password),
         )
         data = response.json()
+        storage_controller = i.split("/")[-1]
+        idrac_inventory["StorageControllerInformation"][storage_controller] = {}
         # message = "\n - Detailed controller information for %s -\n" % i.split("/")[-1]
         # print(message)
         for i in data.items():
@@ -510,26 +585,44 @@ def get_storage_controller_information():
             elif "@" in i[0] or "odata" in i[0]:
                 pass
             elif i[0] == "StorageControllers":
+                idrac_inventory["StorageControllerInformation"][storage_controller][
+                    "StorageControllers"
+                ] = {}
                 for ii in i[1]:
                     for iii in ii.items():
                         if iii[0] == "Status":
                             for iiii in iii[1].items():
-                                idrac_inventory["Storage Controller Information"][
-                                    iiii[0]
-                                ] = iiii[1]
+                                idrac_inventory["StorageControllerInformation"][
+                                    storage_controller
+                                ]["StorageControllers"][iiii[0]] = iiii[1]
                         else:
-                            idrac_inventory["Storage Controller Information"][
-                                iii[0]
-                            ] = [iii[1]]
+                            idrac_inventory["StorageControllerInformation"][
+                                storage_controller
+                            ]["StorageControllers"][iii[0]] = [iii[1]]
             elif i[0] == "Oem":
                 try:
+                    idrac_inventory["StorageControllerInformation"][storage_controller][
+                        "Oem"
+                    ] = {}
+                    idrac_inventory["StorageControllerInformation"][storage_controller][
+                        "Dell"
+                    ] = {}
+                    idrac_inventory["StorageControllerInformation"][storage_controller][
+                        "Dell"
+                    ]["DellController"] = {}
                     for ii in i[1]["Dell"]["DellController"].items():
-                        idrac_inventory["Storage Controller Information"][ii[0]] = ii[1]
+                        idrac_inventory["StorageControllerInformation"][
+                            storage_controller
+                        ]["Dell"]["DellController"][ii[0]] = ii[1]
                 except:
                     for ii in i[1]["Dell"].items():
-                        idrac_inventory["Storage Controller Information"][ii[0]] = ii[1]
+                        idrac_inventory["StorageControllerInformation"][
+                            storage_controller
+                        ]["Dell"][ii[0]] = ii[1]
             else:
-                idrac_inventory["Storage Controller Information"][i[0]] = i[1]
+                idrac_inventory["StorageControllerInformation"][storage_controller][
+                    i[0]
+                ] = i[1]
     else:
         pass
 
@@ -562,6 +655,8 @@ def get_storage_disks_information():
                         auth=(idrac_username, idrac_password),
                     )
                     data = response.json()
+                    storage_drive = ii[1].split("/")[-1]
+                    idrac_inventory["StorageDisksInformation"][storage_drive] = {}
                     # message = (
                     #     "\n - Detailed drive information for %s -\n"
                     #     % ii[1].split("/")[-1]
@@ -569,17 +664,31 @@ def get_storage_disks_information():
                     # print(message)
                     for ii in data.items():
                         if ii[0] == "Oem":
+                            idrac_inventory["StorageDisksInformation"][storage_drive][
+                                "Oem"
+                            ] = {}
+                            idrac_inventory["StorageDisksInformation"][storage_drive][
+                                "Oem"
+                            ]["Dell"] = {}
+                            idrac_inventory["StorageDisksInformation"][storage_drive][
+                                "Oem"
+                            ]["Dell"]["DellPhysicalDisk"] = {}
                             for iii in ii[1]["Dell"]["DellPhysicalDisk"].items():
-                                idrac_inventory["Storage Disks Information"][
-                                    iii[0]
-                                ] = iii[1]
+                                idrac_inventory["StorageDisksInformation"][
+                                    storage_drive
+                                ]["Oem"]["Dell"]["DellPhysicalDisk"][iii[0]] = iii[1]
                         elif ii[0] == "Status":
+                            idrac_inventory["StorageDisksInformation"][storage_drive][
+                                "Status"
+                            ] = {}
                             for iii in ii[1].items():
-                                idrac_inventory["Storage Disks Information"][
-                                    iii[0]
-                                ] = iii[1]
+                                idrac_inventory["StorageDisksInformation"][
+                                    storage_drive
+                                ]["Status"][iii[0]] = iii[1]
                         else:
-                            idrac_inventory["Storage Disks Information"][ii[0]] = ii[1]
+                            idrac_inventory["StorageDisksInformation"][storage_drive][
+                                ii[0]
+                            ] = ii[1]
 
 
 def get_backplane_information():
@@ -610,6 +719,8 @@ def get_backplane_information():
             auth=(idrac_username, idrac_password),
         )
         data = response.json()
+        backplane_name = i.split("/")[-1]
+        idrac_inventory["BackplaneInformation"][backplane_name] = {}
         # message = "\n- Detailed backplane information for %s -\n" % i.split("/")[-1]
         # print(message)
         for iii in data.items():
@@ -627,11 +738,13 @@ def get_backplane_information():
                 pass
             elif iii[0] == "Oem":
                 try:
-                    idrac_inventory["Backplane Information"]["Oem"] = {}
-                    idrac_inventory["Backplane Information"]["Oem"]["Dell"] = {}
-                    idrac_inventory["Backplane Information"]["Oem"]["Dell"][
-                        "DellEnclosure"
+                    idrac_inventory["BackplaneInformation"][backplane_name]["Oem"] = {}
+                    idrac_inventory["BackplaneInformation"][backplane_name]["Oem"][
+                        "Dell"
                     ] = {}
+                    idrac_inventory["BackplaneInformation"][backplane_name]["Oem"][
+                        "Dell"
+                    ]["DellEnclosure"] = {}
                     for iiii in iii[1]["Dell"]["DellEnclosure"].items():
                         if (
                             iiii[0] == "@odata.context"
@@ -640,13 +753,13 @@ def get_backplane_information():
                         ):
                             pass
                         else:
-                            idrac_inventory["Backplane Information"]["Oem"]["Dell"][
-                                "DellEnclosure"
-                            ][iiii[0]] = iiii[1]
+                            idrac_inventory["BackplaneInformation"][backplane_name][
+                                "Oem"
+                            ]["Dell"]["DellEnclosure"][iiii[0]] = iiii[1]
                 except:
                     pass
             else:
-                idrac_inventory["Backplane Information"][iii[0]] = iii[1]
+                idrac_inventory["BackplaneInformation"][backplane_name][iii[0]] = iii[1]
 
 
 def get_network_information():
@@ -669,6 +782,8 @@ def get_network_information():
         message = "\n- WARNING, no network information detected for system\n"
         print(message)
     for i in network_URI_list:
+        net_dev_name = i.split("/")[-1]
+        idrac_inventory["NetworkDeviceInformation"][net_dev_name] = {}
         # message = "\n- Network device details for %s -\n" % i.split("/")[-1]
         # print(message)
         i = i.replace("Interfaces", "Adapters")
@@ -710,14 +825,14 @@ def get_network_information():
             ):
                 pass
             elif ii[0] == "Controllers":
-                idrac_inventory["Network Device Information"][
+                idrac_inventory["NetworkDeviceInformation"][
                     "Controller Capabilities"
                 ] = ii[1][0]["ControllerCapabilities"]
-                idrac_inventory["Network Device Information"][
+                idrac_inventory["NetworkDeviceInformation"][
                     "FirmwarePackageVersion"
                 ] = ii[1][0]["FirmwarePackageVersion"]
             else:
-                idrac_inventory["Network Device Information"][ii[0]] = ii[1]
+                idrac_inventory["NetworkDeviceInformation"][ii[0]] = ii[1]
 
         for z in port_uri_list:
             response = requests.get(
@@ -730,6 +845,10 @@ def get_network_information():
                 print("\n- FAIL, get command failed, error is: %s" % data)
                 sys.exit()
             else:
+                net_dev_port = z.split("/")[-1]
+                idrac_inventory["NetworkDeviceInformation"][net_dev_name][
+                    net_dev_port
+                ] = {}
                 # message = "\n- Network port details for %s -\n" % z.split("/")[-1]
                 # print(message)
                 for ii in data.items():
@@ -743,6 +862,15 @@ def get_network_information():
                         pass
                     elif ii[0] == "Oem":
                         try:
+                            idrac_inventory["NetworkDeviceInformation"][net_dev_name][
+                                net_dev_port
+                            ]["Oem"] = {}
+                            idrac_inventory["NetworkDeviceInformation"][net_dev_name][
+                                net_dev_port
+                            ]["Oem"]["Dell"] = {}
+                            idrac_inventory["NetworkDeviceInformation"][net_dev_name][
+                                net_dev_port
+                            ]["Oem"]["Dell"]["DellSwitchConnection"] = {}
                             for iii in ii[1]["Dell"]["DellSwitchConnection"].items():
                                 if (
                                     iii[0] == "@odata.context"
@@ -750,13 +878,24 @@ def get_network_information():
                                 ):
                                     pass
                                 else:
-                                    idrac_inventory["Network Device Information"][
+                                    idrac_inventory["NetworkDeviceInformation"][
+                                        net_dev_name
+                                    ][net_dev_port]["Oem"]["Dell"][
+                                        "DellSwitchConnection"
+                                    ][
                                         iii[0]
-                                    ] = iii[1]
+                                    ] = iii[
+                                        1
+                                    ]
+                                    # idrac_inventory["NetworkDeviceInformation"][
+                                    #     iii[0]
+                                    # ] = iii[1]
                         except:
                             pass
                     else:
-                        idrac_inventory["Network Device Information"][ii[0]] = ii[1]
+                        idrac_inventory["NetworkDeviceInformation"][net_dev_name][
+                            net_dev_port
+                        ][ii[0]] = ii[1]
 
 
 if __name__ == "__main__":
@@ -788,9 +927,12 @@ if __name__ == "__main__":
         get_backplane_information()
         get_network_information()
 
-    with open("hw_inventory.json", "w") as write_file:
-        json.dump(idrac_inventory, write_file, indent=2)
+    print(json.dumps(idrac_inventory))
+
+    # with open(file_name, "w") as write_file:
+    #     json.dump(idrac_inventory, write_file, indent=2)
+
     print(
-        '\n- WARNING, output also captured in "%s\hw_inventory.json" file' % os.getcwd()
+        '\n- WARNING, output also captured in "%s\%s" file' % (os.getcwd(), file_name)
     )
 
