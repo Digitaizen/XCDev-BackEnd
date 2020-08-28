@@ -991,5 +991,4 @@ if __name__ == "__main__":
     # if args["pj"]:
     #     print(json.dumps(idrac_inventory, indent=2))
     # else:
-    #     # print(json.dumps(idrac_inventory["MemoryInformation"]))  # default
-print(idrac_inventory["MemoryInformation"])  # default
+print(json.dumps(idrac_inventory))  # default

@@ -985,56 +985,56 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
       if (idrac_username !== "" && idrac_password !== "") {
         const hwInventoryScript = exec(
           // `python get_iDRAC_Inventory.py -ip 100.80.144.128 -u ${idrac_username} -p ${idrac_password} -m y`
-          `python get_iDRAC_Inventory.py -ip 100.80.144.128 -u ${idrac_username} -p ${idrac_password} -m y`
+          `python temp.py -ip 100.80.144.128 -u ${idrac_username} -p ${idrac_password} -s y -c y -m y -n y`
         );
         hwInventoryScript.stdout.on("data", (data) => {
           let resultData = JSON.parse(data);
-          console.log(resultData);
+          // console.log(resultData);
           console.log("INFORMATION RECIEVED");
 
-          // _db
-          //   .collection("componentInventory")
-          //   .findOne(
-          //     { serviceTag: resultData.SystemInformation.SKU },
-          //     (err, results) => {
-          //       if (err) {
-          //         return console.log(err);
-          //       }
-          //       // If an entry with the same service tag is found, update the entry
-          //       if (results !== null) {
-          //         _db.collection("componentInventory").updateOne(
-          //           { serviceTag: resultData.SystemInformation.SKU },
-          //           {
-          //             $set: {
-          //               data: resultData,
-          //             },
-          //           },
-          //           (err) => {
-          //             if (err) {
-          //               return console.log(err);
-          //             }
-          //           }
-          //         );
+          _db
+            .collection("componentInventory")
+            .findOne(
+              { serviceTag: resultData.SystemInformation.SKU },
+              (err, results) => {
+                if (err) {
+                  return console.log(err);
+                }
+                // If an entry with the same service tag is found, update the entry
+                if (results !== null) {
+                  _db.collection("componentInventory").updateOne(
+                    { serviceTag: resultData.SystemInformation.SKU },
+                    {
+                      $set: {
+                        data: resultData,
+                      },
+                    },
+                    (err) => {
+                      if (err) {
+                        return console.log(err);
+                      }
+                    }
+                  );
 
-          //         // If no entry with the same service tag is found, add a new entry
-          //       } else {
-          //         if (!err) {
-          //           _db.collection("componentInventory").insertOne(
-          //             {
-          //               serviceTag: resultData.SystemInformation.SKU,
-          //               data: resultData,
-          //             },
-          //             { checkKeys: false },
-          //             (err, res) => {
-          //               if (err) {
-          //                 return console.log(err);
-          //               }
-          //             }
-          //           );
-          //         }
-          //       }
-          //     }
-          //   );
+                  // If no entry with the same service tag is found, add a new entry
+                } else {
+                  if (!err) {
+                    _db.collection("componentInventory").insertOne(
+                      {
+                        serviceTag: resultData.SystemInformation.SKU,
+                        data: resultData,
+                      },
+                      { checkKeys: false },
+                      (err, res) => {
+                        if (err) {
+                          return console.log(err);
+                        }
+                      }
+                    );
+                  }
+                }
+              }
+            );
 
           // res.status(200).json({
           //   success: true,
