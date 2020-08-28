@@ -25,7 +25,7 @@ from datetime import datetime
 warnings.filterwarnings("ignore")
 
 parser = argparse.ArgumentParser(
-    description="Python script using Redfish API to get system hardware inventory(output will be printed to the screen and also copied to a text file). This includes information for storage controllers, memory, network devices, general system details, power supplies, hard drives, fans, backplanes, processors"
+    description="Python script using Redfish API to get system hardware inventory(output will be printed to the screen and also can be exported to a json file by passing argument). This includes information for storage controllers, memory, network devices, general system details, power supplies, hard drives, fans, backplanes, processors"
 )
 parser.add_argument("-ip", help="iDRAC IP address", required=True)
 parser.add_argument("-u", help="iDRAC username", required=True)
@@ -59,6 +59,14 @@ parser.add_argument(
     help='Get all system information / device information, pass in "y"',
     required=False,
 )
+parser.add_argument(
+    "-d", help='Dump results of a query into a JSON file, pass in "y"', required=False
+)
+parser.add_argument(
+    "-pj",
+    help='Output results of a query to console in pretty format, pass in "y"',
+    required=False,
+)
 
 
 args = vars(parser.parse_args())
@@ -78,6 +86,7 @@ idrac_inventory = {
     "NetworkDeviceInformation": {},
     "PowerSupplyInformation": {},
     "BackplaneInformation": {},
+    "FanInformation": {},
 }
 
 try:
@@ -284,7 +293,6 @@ def get_cpu_information():
 
 
 def get_fan_information():
-    f = open("hw_inventory.txt", "a")
     response = requests.get(
         "https://%s/redfish/v1/Systems/System.Embedded.1" % idrac_ip,
         verify=False,
@@ -294,11 +302,9 @@ def get_fan_information():
     if response.status_code != 200:
         print("\n- FAIL, get command failed, error is: %s" % data)
         sys.exit()
-    else:
-        message = "\n---- Fan Information ----\n"
-        f.writelines(message)
-        f.writelines("\n")
-        print(message)
+        # else:
+        # message = "\n---- Fan Information ----\n"
+        # print(message)
     fan_list = []
     if data["Links"]["CooledBy"] == []:
         print("\n- WARNING, no fans detected for system")
@@ -318,42 +324,35 @@ def get_fan_information():
             else:
                 data_get = response.json()
                 try:
-                    message = "\n- Details for %s -\n" % data_get["FanName"]
-                    f.writelines(message)
-                    print(message)
-                    message = "\n"
-                    f.writelines(message)
+                    fan_name = data_get["FanName"].replace(" ", "")
+                    idrac_inventory["FanInformation"][fan_name] = {}
+                    # message = "\n- Details for %s -\n" % data_get["FanName"]
+                    # print(message)
                 except:
                     pass
                 if "Fans" not in data_get.keys():
                     for ii in data_get.items():
-                        message = "%s: %s" % (ii[0], ii[1])
-                        f.writelines(message)
-                        print(message)
-                        message = "\n"
-                        f.writelines(message)
-                    message = "\n"
-                    f.writelines(message)
-                    print(message)
+                        idrac_inventory["FanInformation"][fan_name][ii[0]] = ii[1]
+                    #     message = "%s: %s" % (ii[0], ii[1])
+                    #     print(message)
+                    #     message = "\n"
+                    # message = "\n"
+                    # print(message)
                 else:
                     count = 0
                     while True:
                         if count == len(fan_list):
                             return
                         for i in data_get["Fans"]:
-                            message = "\n- Details for %s -\n" % i["FanName"]
+                            # message = "\n- Details for %s -\n" % i["FanName"]
                             count += 1
-                            f.writelines(message)
-                            print(message)
-                            message = "\n"
-                            f.writelines(message)
+                            # print(message)
                             for ii in i.items():
-                                message = "%s: %s" % (ii[0], ii[1])
-                                f.writelines(message)
-                                print(message)
-                                message = "\n"
-                                f.writelines(message)
-    f.close()
+                                idrac_inventory["FanInformation"][fan_name][ii[0]] = ii[
+                                    1
+                                ]
+                                # message = "%s: %s" % (ii[0], ii[1])
+                                # print(message)
 
 
 def get_ps_information():
@@ -887,15 +886,18 @@ def get_network_information():
                                     ] = iii[
                                         1
                                     ]
-                                    # idrac_inventory["NetworkDeviceInformation"][
-                                    #     iii[0]
-                                    # ] = iii[1]
                         except:
                             pass
                     else:
                         idrac_inventory["NetworkDeviceInformation"][net_dev_name][
                             net_dev_port
                         ][ii[0]] = ii[1]
+
+
+def save_to_json():
+    with open(file_name, "w") as write_file:
+        json.dump(idrac_inventory, write_file, indent=2)
+    print('\n- WARNING, output captured in "%s\%s" file' % (os.getcwd(), file_name))
 
 
 if __name__ == "__main__":
@@ -920,19 +922,16 @@ if __name__ == "__main__":
         get_system_information()
         get_memory_information()
         get_cpu_information()
-        # get_fan_information()
+        get_fan_information()
         get_ps_information()
         get_storage_controller_information()
         get_storage_disks_information()
         get_backplane_information()
         get_network_information()
-
-    print(json.dumps(idrac_inventory))
-
-    # with open(file_name, "w") as write_file:
-    #     json.dump(idrac_inventory, write_file, indent=2)
-
-    print(
-        '\n- WARNING, output also captured in "%s\%s" file' % (os.getcwd(), file_name)
-    )
+    if args["d"]:
+        save_to_json()
+    if args["pj"]:
+        print(json.dumps(idrac_inventory, indent=2))
+    else:
+        print(json.dumps(idrac_inventory))  # default
 
