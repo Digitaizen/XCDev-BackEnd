@@ -51,8 +51,7 @@ parser.add_argument(
 parser.add_argument(
     "-c", help='Get processor information only, pass in "y"', required=False
 )
-parser.add_argument(
-    "-f", help='Get fan information only, pass in "y"', required=False)
+parser.add_argument("-f", help='Get fan information only, pass in "y"', required=False)
 parser.add_argument(
     "-ps", help='Get power supply information only, pass in "y"', required=False
 )
@@ -224,6 +223,8 @@ def get_memory_information():
             else:
                 # idrac_inventory["MemoryInformation"][dimm_slot][ii[0]] = ii[1]
                 idrac_inventory["MemoryInformation"][dimm_slot][ii[0]] = ii[1]
+
+
 # def get_memory_information():
 #     response = requests.get(
 #         "https://%s/redfish/v1/Systems/System.Embedded.1/Memory" % idrac_ip,
@@ -327,8 +328,7 @@ def get_cpu_information():
                     pass
                 elif ii[0] == "Oem":
                     idrac_inventory["ProcessorInformation"][cpu]["Oem"] = {}
-                    idrac_inventory["ProcessorInformation"][cpu]["Oem"]["Dell"] = {
-                    }
+                    idrac_inventory["ProcessorInformation"][cpu]["Oem"]["Dell"] = {}
                     idrac_inventory["ProcessorInformation"][cpu]["Oem"]["Dell"][
                         "DellProcessor"
                     ] = {}
@@ -473,8 +473,7 @@ def get_ps_information():
                             ps_name = data_get["PowerSupplies"][0]["Name"].replace(
                                 " ", ""
                             )
-                            idrac_inventory["PowerSupplyInformation"][ps_name] = {
-                            }
+                            idrac_inventory["PowerSupplyInformation"][ps_name] = {}
                             # message = (
                             #     "\n- Details for %s -\n"
                             #     % data_get["PowerSupplies"][0]["Name"]
@@ -792,8 +791,7 @@ def get_backplane_information():
                 pass
             elif iii[0] == "Oem":
                 try:
-                    idrac_inventory["BackplaneInformation"][backplane_name]["Oem"] = {
-                    }
+                    idrac_inventory["BackplaneInformation"][backplane_name]["Oem"] = {}
                     idrac_inventory["BackplaneInformation"][backplane_name]["Oem"][
                         "Dell"
                     ] = {}
@@ -952,10 +950,9 @@ def get_network_information():
 
 def save_to_json():
     with open(file_name, "w") as write_file:
-        # json.dump(idrac_inventory, write_file, indent=2)
-        json.dump(idrac_inventory["MemoryInformation"], write_file, indent=2)
-    print('\n- WARNING, output captured in "%s\%s" file' %
-          (os.getcwd(), file_name))
+        json.dump(idrac_inventory, write_file, indent=2)
+        # json.dump(idrac_inventory["MemoryInformation"], write_file, indent=2)
+    print('\n- WARNING, output captured in "%s\%s" file' % (os.getcwd(), file_name))
 
 
 if __name__ == "__main__":
@@ -986,9 +983,9 @@ if __name__ == "__main__":
         get_storage_disks_information()
         get_backplane_information()
         get_network_information()
-    # if args["d"]:
-    #     save_to_json()
-    # if args["pj"]:
-    #     print(json.dumps(idrac_inventory, indent=2))
-    # else:
-print(json.dumps(idrac_inventory))  # default
+    if args["d"]:
+        save_to_json()
+    if args["pj"]:
+        print(json.dumps(idrac_inventory, indent=2, ensure_ascii=False))
+    else:
+        print(json.dumps(idrac_inventory, ensure_ascii=False))  # default

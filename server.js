@@ -32,6 +32,8 @@ const { get } = require("http");
 const { readdirSync, statSync } = require("fs");
 let path = require("path");
 const bmrIsoProcess = require("./boot_to_BMR");
+const dJSON = require('dirty-json');
+const { response } = require("express");
 
 // Declare the globals ////////////////////////////////////////////////////////
 const dbUrl = "mongodb://localhost:27017";
@@ -39,7 +41,7 @@ const dbName = "dev";
 const dbColl_Servers = "servers";
 const dbColl_Users = "users";
 const portNum = 8080;
-const ipFile = "./active_iDRAC_ips.txt";
+const ipFile = "./test_iDRAC_ips.txt";
 const iDracLogin = "root";
 const iDracPassword = "calvin";
 const corsOptions = {
@@ -77,6 +79,75 @@ function scanSubnet() {
       }
     );
   });
+}
+
+function getServerInventory(node_ip) {
+  return new Promise((resolve, reject) => {
+    console.log(`${node_ip} -> getServerInventory function called..`);
+    // Execute the Python script to get iDRAC HW inventory
+    exec(`python get_iDRAC_Inventory.py -ip ${node_ip} -u ${iDracLogin} -p ${iDracPassword} -a y`,
+      (err, stdout, stderr) => {
+        if (err || stderr) {
+          reject({ success: false, message: stderr });
+        } else {
+          resolve({ success: true, message: stdout });
+        }
+      }
+    );
+  });
+}
+
+function writeToInventoryColl(dbObject, jsonObject) {
+  return new Promise((resolve, reject) => {
+    dbObject
+      .collection("inventory")
+      .findOne(
+        { serviceTag: jsonObject.SystemInformation.SKU },
+        (err, res) => {
+          if (err) {
+            console.log(err);
+          }
+          // If an entry with the same service tag is found, update the entry
+          if (res !== null) {
+            dbObject.collection("inventory").updateOne(
+              { serviceTag: jsonObject.SystemInformation.SKU },
+              {
+                $set: {
+                  data: jsonObject,
+                },
+              },
+              (err, res) => {
+                if (err) {
+                  reject({ success: false, message: "Error on updating record: " + err });
+                } else {
+                  resolve({ success: true, message: "Updated the record." })
+                }
+              }
+            );
+
+            // If no entry with the same service tag is found, add a new entry
+          } else {
+            if (!err) {
+              dbObject.collection("inventory").insertOne(
+                {
+                  serviceTag: jsonObject.SystemInformation.SKU,
+                  data: jsonObject,
+                },
+                { checkKeys: false },
+                (err, res) => {
+                  if (err) {
+                    reject({ success: false, message: "Error on inserting record: " + err });
+                  } else {
+                    resolve({ success: true, message: "Inserted new record." });
+                  }
+                }
+              );
+            }
+          }
+        }
+      );
+  })
+
 }
 
 /**
@@ -443,525 +514,234 @@ const app = express();
 app.use(cors(corsOptions));
 
 // Connect to the database, start the server, query iDRACs via RedFish, and populate db
-MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
-  (client) => {
-    const _db = client.db(dbName);
-    console.log(`Connected to ${dbName}`);
+MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 })
+  .then(
+    (client) => {
+      const _db = client.db(dbName);
+      console.log(`Connected to ${dbName}`);
 
-    // Defining the directory where express will serve the website
-    app.use(express.static("public"));
+      // Defining the directory where express will serve the website
+      app.use(express.static("public"));
 
-    // Start the server
-    app.listen(portNum, () => {
-      console.log(`Server started on port ${portNum}`);
-    });
+      // Start the server
+      app.listen(portNum, () => {
+        console.log(`Server started on port ${portNum}`);
+      });
 
-    // Default reply for home page
-    app.get("/", (req, res) => {
-      res.sendFile(__dirname + "/index.html");
-    });
+      // Default reply for home page
+      app.get("/", (req, res) => {
+        res.sendFile(__dirname + "/index.html");
+      });
 
-    // Define opts for strategy
-    const opts = {};
-    opts.jwtFromRequest = ExtractJwt.fromAuthHeaderAsBearerToken();
-    opts.secretOrKey = keys.secretOrKey;
+      // Define opts for strategy
+      const opts = {};
+      opts.jwtFromRequest = ExtractJwt.fromAuthHeaderAsBearerToken();
+      opts.secretOrKey = keys.secretOrKey;
 
-    // Define strategy for passport instance
-    passport.use(
-      new JwtStrategy(opts, (jwt_payload, done) => {
-        _db
-          .collection(dbColl_Users)
-          .findOne({ _id: jwt_payload.id })
-          .then((user) => {
-            if (user) {
-              return done(null, user);
-            }
-            return done(null, false);
-          })
-          .catch((err) => console.log(err));
-      })
-    );
-
-    // Initialize passport instance
-    app.use(passport.initialize());
-
-    // Allow parsing of res.body
-    app.use(
-      bodyParser.urlencoded({
-        extended: true,
-      })
-    );
-
-    app.use(bodyParser.json());
-
-    // Log API responses to access.log
-    var accessLogStream = fs.createWriteStream(__dirname + "/access.log", {
-      flags: "a",
-    });
-    morganBody(app, { stream: accessLogStream, noColors: true });
-
-    // Accept valid login credentials and return a JSON web token
-    app.post("/login", (req, res) => {
-      // Form validation
-      const { errors, isValid } = validateLoginInput(req.body);
-
-      // Check validation
-      if (!isValid) {
-        return res.status(400).json(Object.assign({ success: false }, errors));
-      }
-
-      // If user exists and password is correct, return a success token
-      _db
-        .collection(dbColl_Users)
-        .findOne({
-          username: {
-            $regex: new RegExp(
-              "^" + req.body.username.toLowerCase() + "$",
-              "i"
-            ),
-          },
-        })
-        .then((user) => {
-          // Check if user exists
-          if (!user) {
-            return res.status(404).json({
-              success: false,
-              message: "Username not found",
-            });
-          }
-
-          // Check password
-
-          if (req.body.password == user.password) {
-            // User matched
-            // Create JWT Payload
-            const payload = {
-              id: user.id,
-              name: user.name,
-            };
-
-            // Sign token
-            jwt.sign(
-              payload,
-              keys.secretOrKey,
-              {
-                expiresIn: 31556926, // 1 year in seconds
-              },
-              (err, token) => {
-                res.json({
-                  success: true,
-                  message: "Login is successful",
-                  token: "Bearer " + token,
-                  userInfo: user,
-                });
+      // Define strategy for passport instance
+      passport.use(
+        new JwtStrategy(opts, (jwt_payload, done) => {
+          _db
+            .collection(dbColl_Users)
+            .findOne({ _id: jwt_payload.id })
+            .then((user) => {
+              if (user) {
+                return done(null, user);
               }
-            );
-          } else {
-            return res
-              .status(400)
-              .json({ success: false, message: "Password incorrect" });
-          }
-        });
-    });
+              return done(null, false);
+            })
+            .catch((err) => console.log(err));
+        })
+      );
 
-    // Add new user credentials to users collection and return credentials as JSON
-    app.post("/register", async (req, res) => {
-      // Form validation
-      const { errors, isValid } = validateRegisterInput(req.body);
+      // Initialize passport instance
+      app.use(passport.initialize());
 
-      // Check validation
-      if (!isValid) {
-        return res.status(400).json(Object.assign({ success: false }, errors));
-      }
+      // Allow parsing of res.body
+      app.use(
+        bodyParser.urlencoded({
+          extended: true,
+        })
+      );
 
-      try {
-        // Check if email is already in use; if not, create new user record in collection
+      app.use(bodyParser.json());
+
+      // Log API responses to access.log
+      var accessLogStream = fs.createWriteStream(__dirname + "/access.log", {
+        flags: "a",
+      });
+      morganBody(app, { stream: accessLogStream, noColors: true });
+
+      // Accept valid login credentials and return a JSON web token
+      app.post("/login", (req, res) => {
+        // Form validation
+        const { errors, isValid } = validateLoginInput(req.body);
+
+        // Check validation
+        if (!isValid) {
+          return res.status(400).json(Object.assign({ success: false }, errors));
+        }
+
+        // If user exists and password is correct, return a success token
         _db
           .collection(dbColl_Users)
           .findOne({
-            email: {
-              $regex: new RegExp("^" + req.body.email.toLowerCase() + "$", "i"),
+            username: {
+              $regex: new RegExp(
+                "^" + req.body.username.toLowerCase() + "$",
+                "i"
+              ),
             },
           })
           .then((user) => {
-            if (user) {
+            // Check if user exists
+            if (!user) {
+              return res.status(404).json({
+                success: false,
+                message: "Username not found",
+              });
+            }
+
+            // Check password
+
+            if (req.body.password == user.password) {
+              // User matched
+              // Create JWT Payload
+              const payload = {
+                id: user.id,
+                name: user.name,
+              };
+
+              // Sign token
+              jwt.sign(
+                payload,
+                keys.secretOrKey,
+                {
+                  expiresIn: 31556926, // 1 year in seconds
+                },
+                (err, token) => {
+                  res.json({
+                    success: true,
+                    message: "Login is successful",
+                    token: "Bearer " + token,
+                    userInfo: user,
+                  });
+                }
+              );
+            } else {
               return res
                 .status(400)
-                .json({ success: false, message: "Email already exists" });
-            } else {
-              _db
-                .collection(dbColl_Users)
-                .insertOne(
-                  {
-                    name: req.body.name,
-                    email: req.body.email,
-                    username: req.body.username,
-                    password: req.body.password,
-                  },
-                  { checkKeys: false }
-                )
-                .then((user) =>
-                  res.json(
-                    Object.assign(
-                      { success: true, message: "Registration is successful" },
-                      user.ops[0]
+                .json({ success: false, message: "Password incorrect" });
+            }
+          });
+      });
+
+      // Add new user credentials to users collection and return credentials as JSON
+      app.post("/register", async (req, res) => {
+        // Form validation
+        const { errors, isValid } = validateRegisterInput(req.body);
+
+        // Check validation
+        if (!isValid) {
+          return res.status(400).json(Object.assign({ success: false }, errors));
+        }
+
+        try {
+          // Check if email is already in use; if not, create new user record in collection
+          _db
+            .collection(dbColl_Users)
+            .findOne({
+              email: {
+                $regex: new RegExp("^" + req.body.email.toLowerCase() + "$", "i"),
+              },
+            })
+            .then((user) => {
+              if (user) {
+                return res
+                  .status(400)
+                  .json({ success: false, message: "Email already exists" });
+              } else {
+                _db
+                  .collection(dbColl_Users)
+                  .insertOne(
+                    {
+                      name: req.body.name,
+                      email: req.body.email,
+                      username: req.body.username,
+                      password: req.body.password,
+                    },
+                    { checkKeys: false }
+                  )
+                  .then((user) =>
+                    res.json(
+                      Object.assign(
+                        { success: true, message: "Registration is successful" },
+                        user.ops[0]
+                      )
                     )
                   )
-                )
-                .catch((err) => console.log(err));
-              console.log("You're registered! Now login");
-            }
-          });
-      } catch {
-        console.log("There was an error while registering");
-      }
-    });
-
-    // API endpoint to run bash script that finds live iDRACs on a subnet
-    app.post("/findServers", (req, res) => {
-      console.log("API to scan IPs is called..");
-      scanSubnet()
-        .then((response) => {
-          if (response.message === "success") {
-            console.log("Scan completed successfully.");
-            res.json({
-              status: true,
-              message: "Scan is complete, file with IPs created.",
-            });
-            return;
-          }
-          throw new Error();
-        })
-        .catch((error) => {
-          console.log("Scan failed with error: ", error.message);
-          res.json({ status: false, message: error.message });
-        });
-    });
-
-    // Make call to iDRAC Redfish API and save the response data in MongoDB collection
-    app.post("/postServers", (req, res) => {
-      res.connection.setTimeout(0);
-
-      let idracIps = readIpFile(ipFile);
-      console.log(idracIps);
-      return getRedfishData(idracIps, _db);
-    });
-
-    // Get collection data from MongoDB and return relevant data
-    app.get("/getServers", (req, res) => {
-      getMongoData(_db).then((results) => {
-        res.send(results);
-      });
-    });
-
-    // Get status value of server that has specified id
-    app.get("/status/:id", (req, res) => {
-      _db
-        .collection(dbColl_Servers)
-        .findOne(
-          { _id: mongoose.Types.ObjectId(req.params.id) },
-          (err, results) => {
-            if (err) {
-              res.status(500).json(Object.assign({ success: false }, err));
-            } else {
-              res.json(
-                Object.assign(
-                  {
-                    success: true,
-                    message:
-                      "Document with specified _id successfully retrieved",
-                  },
-                  results
-                )
-              );
-            }
-          }
-        );
-    });
-
-    app.patch("/patchStatus/:id", (req, res) => {
-      _db.collection(dbColl_Servers).updateOne(
-        { _id: mongoose.Types.ObjectId(req.params.id) },
-        {
-          $set: {
-            status: req.body.status,
-            timestamp: req.body.timestamp,
-          },
-        },
-        (err, results) => {
-          if (err) {
-            res.status(500).json(Object.assign({ success: false }, err));
-          } else {
-            res
-              .status(200)
-              .json(
-                Object.assign(
-                  { success: true, message: "Status successfully patched" },
-                  results
-                )
-              );
-          }
-        }
-      );
-    });
-
-    // Patch comments value of server that has specified id
-    app.patch("/patchComments/:id", (req, res) => {
-      _db.collection(dbColl_Servers).updateOne(
-        { _id: mongoose.Types.ObjectId(req.params.id) },
-        {
-          $set: {
-            comments: req.body.comments,
-          },
-        },
-        (err, results) => {
-          if (err) {
-            res.status(500).json(Object.assign({ success: false }, err));
-          } else {
-            res
-              .status(200)
-              .json(
-                Object.assign(
-                  { success: true, message: "Comment successfully patched" },
-                  results
-                )
-              );
-          }
-        }
-      );
-    });
-
-    // Fetch servers checked out by a specified user
-    app.get("/getUserServers/:name", (req, res) => {
-      _db
-        .collection(dbColl_Servers)
-        .find({ status: req.params.name })
-        .toArray(function (err, resultArray) {
-          if (err) {
-            res.status(500).json({ success: false, message: err });
-          } else {
-            res.status(200).json({
-              success: true,
-              message: "User servers successfully fetched",
-              results: resultArray,
-            });
-          }
-        });
-    });
-
-    // Fetch names of all the folders listed for Factory Block on the XC Night Flyer Share
-    // app.get("/getIsoFiles", (req, res) => {
-    // let source = "";
-    app.get("/getFactoryBlock", (req, res) => {
-      // const myShellScript = exec("sh mapSharedDrive.sh ./");
-      // myShellScript.stdout.on("data", (data) => {
-      //   console.log("success:" + data);
-      // });
-      // myShellScript.stderr.on("data", (data) => {
-      //   console.error(data);
-      // });
-
-      let source = "/mnt/bmr";
-
-      const getDirectories = (source) =>
-        readdirSync(source, { withFileTypes: true })
-          .filter((dirent) => dirent.isDirectory())
-          .map((dirent) => {
-            return {
-              value: dirent.name,
-              label: dirent.name,
-            };
-          });
-
-      let optionsFactoryBlock = getDirectories(source);
-
-      res.status(200).json({
-        success: true,
-        message: "Factory Blocks successfully fetched",
-        results: optionsFactoryBlock,
-        // results: optionsFactoryBlock,
-      });
-    });
-
-    // Fetch names of .iso files from given directory path
-    app.get("/getBmrIso", (req, res) => {
-      let source = "/mnt/bmr";
-      const getIsoFiles = function (dirPath) {
-        let files = readdirSync(dirPath);
-        let arrayOfFiles = [];
-        files.map((name) => {
-          let extension = name.endsWith("iso") && name.includes("BMR3");
-          if (extension === true) {
-            arrayOfFiles.push(name);
-          }
-        });
-        return arrayOfFiles.map((fileName) => {
-          return {
-            value: fileName,
-            label: fileName,
-          };
-        });
-      };
-
-      console.log("SOURCE IS: " + source);
-      let optionsIsoFile = getIsoFiles(source);
-
-      res.status(200).json({
-        success: true,
-        message: "ISO file paths successfully fetched",
-        results: optionsIsoFile,
-      });
-    });
-
-    // Getting data from Front-END and passing it to the BMR Process Scripts
-    app.post("/bmrFactoryImaging", (req, res) => {
-      // console.log(req.body);
-
-      // Define bmr payload values for mounting network image
-      let ip_arr = req.body.selectedRowData.map((server) => {
-        return server.ip;
-      });
-      let image_name = req.body.selectedBmrIsoOption;
-      let block_name = req.body.selectedFactoryBlockOption;
-      let hypervisor_name = req.body.selectedHypervisorOption;
-
-      let bmr_payload_values = fs
-        .readFileSync("bmr_payload_values.txt")
-        .toString()
-        .replace(/\r/g, "")
-        .split("\n");
-      let share_ip = bmr_payload_values[0];
-      let share_name = bmr_payload_values[1];
-      let share_type = bmr_payload_values[2];
-      let bmr_username = bmr_payload_values[3];
-      let bmr_password = bmr_payload_values[4];
-
-      // Mount BMR ISO
-      // AZAT SCRIPTS START
-      if (
-        ip_arr !== "" &&
-        share_ip !== "" &&
-        share_name !== "" &&
-        share_type !== "" &&
-        image_name !== "" &&
-        bmr_username !== "" &&
-        bmr_password !== ""
-      ) {
-        bmrIsoProcess
-          .mountNetworkImageOnNodes(
-            ip_arr,
-            share_ip,
-            share_type,
-            share_name,
-            image_name,
-            bmr_username,
-            bmr_password
-          )
-          .then((response) => {
-            console.log(response.message);
-            // If ISO mount successful, make lclog comments with BMR info on each iDRAC
-            if (response.success) {
-              let lclogs = [];
-
-              // Define calls to lclog comment script for each server
-              for (const ipAddress of ip_arr) {
-                // Wrap script calls in Promises and store them in 'lclogs' array
-                lclogs.push(
-                  new Promise((resolve, reject) => {
-                    const myShellScript = exec(
-                      `sh bmr-parm.sh ${ipAddress} ${block_name} ${hypervisor_name} ${share_name} ${bmr_username} ${bmr_password}`
-                    );
-                    myShellScript.stdout.on("data", (data) => {
-                      // console.log(data);
-                      resolve({
-                        success: true,
-                        message: `Created lclog comment for server ${ipAddress} with seq id ${data}`,
-                      });
-                    });
-                    myShellScript.stderr.on("data", (data) => {
-                      // console.error(data);
-                      reject({
-                        success: false,
-                        message: data,
-                      });
-                    });
-                  })
-                );
+                  .catch((err) => console.log(err));
+                console.log("You're registered! Now login");
               }
-
-              // Execute each lclog script call
-              Promise.all(lclogs).then((responses) => {
-                console.log(responses);
-
-                // After lclog comments finish, reboot each server
-                bmrIsoProcess.rebootSelectedNodes(ip_arr).then((response) => {
-                  console.log(response.message);
-
-                  if (response.success) {
-                    res
-                      .status(200)
-                      .json({ success: true, message: response.message });
-                  } else {
-                    res
-                      .status(500)
-                      .json({ success: false, message: response.message });
-                  }
-                });
-              });
-            } else {
-              res
-                .status(500)
-                .json({ success: false, message: response.message });
-            }
-          });
-      }
-    });
-
-    // Reset password of user with specified password-reset token
-    app.post("/reset", async (req, res) => {
-      _db
-        .collection(dbColl_Users)
-        .findOne({ username: req.body.username })
-        .then((user) => {
-          // Check if user exists
-          if (!user) {
-            return res
-              .status(404)
-              .json({ success: false, message: "Username not found" });
-          }
-
-          // Check if password is long enough
-          if (!Validator.isLength(req.body.password, { min: 6, max: 30 })) {
-            return res.status(404).json({
-              success: false,
-              message: "Password must be at least 6 characters",
             });
-          }
+        } catch {
+          console.log("There was an error while registering");
+        }
+      });
 
-          // Check if passwords match
-          if (!Validator.equals(req.body.password, req.body.password2)) {
-            return res
-              .status(404)
-              .json({ success: false, message: "Passwords must match" });
-          }
+      // API endpoint to run bash script that finds live iDRACs on a subnet
+      app.post("/findServers", (req, res) => {
+        console.log("API to scan IPs is called..");
+        scanSubnet()
+          .then((response) => {
+            if (response.message === "success") {
+              console.log("Scan completed successfully.");
+              res.json({
+                status: true,
+                message: "Scan is complete, file with IPs created.",
+              });
+              return;
+            }
+            throw new Error();
+          })
+          .catch((error) => {
+            console.log("Scan failed with error: ", error.message);
+            res.json({ status: false, message: error.message });
+          });
+      });
 
-          // Update user record with new password
-          _db.collection(dbColl_Users).updateOne(
-            { username: req.body.username },
-            {
-              $set: {
-                password: req.body.password,
-              },
-            },
-            function (err, results) {
+      // Make call to iDRAC Redfish API and save the response data in MongoDB collection
+      app.post("/postServers", (req, res) => {
+        res.connection.setTimeout(0);
+
+        let idracIps = readIpFile(ipFile);
+        console.log(idracIps);
+        return getRedfishData(idracIps, _db);
+      });
+
+      // Get collection data from MongoDB and return relevant data
+      app.get("/getServers", (req, res) => {
+        getMongoData(_db).then((results) => {
+          res.send(results);
+        });
+      });
+
+      // Get status value of server that has specified id
+      app.get("/status/:id", (req, res) => {
+        _db
+          .collection(dbColl_Servers)
+          .findOne(
+            { _id: mongoose.Types.ObjectId(req.params.id) },
+            (err, results) => {
               if (err) {
                 res.status(500).json(Object.assign({ success: false }, err));
               } else {
-                res.status(200).json(
+                res.json(
                   Object.assign(
                     {
                       success: true,
-                      message: "Password successfully reset",
+                      message:
+                        "Document with specified _id successfully retrieved",
                     },
                     results
                   )
@@ -969,92 +749,375 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
               }
             }
           );
-        });
-    });
+      });
 
-    // **Component Inventory API Endpoint START**
-    app.post("/hardwareInventoryToDb", (req, res) => {
-      let hw_payload_values = fs
-        .readFileSync("bmr_payload_values.txt")
-        .toString()
-        .replace(/\r/g, "")
-        .split("\n");
-      let idrac_username = hw_payload_values[5];
-      let idrac_password = hw_payload_values[6];
-      // if (ip_arr !== "" && idrac_username !== "" && idrac_password !== "") {
-      if (idrac_username !== "" && idrac_password !== "") {
-        const hwInventoryScript = exec(
-          // `python get_iDRAC_Inventory.py -ip 100.80.144.128 -u ${idrac_username} -p ${idrac_password} -m y`
-          `python temp.py -ip 100.80.144.128 -u ${idrac_username} -p ${idrac_password} -s y -c y -m y -n y`
+      app.patch("/patchStatus/:id", (req, res) => {
+        _db.collection(dbColl_Servers).updateOne(
+          { _id: mongoose.Types.ObjectId(req.params.id) },
+          {
+            $set: {
+              status: req.body.status,
+              timestamp: req.body.timestamp,
+            },
+          },
+          (err, results) => {
+            if (err) {
+              res.status(500).json(Object.assign({ success: false }, err));
+            } else {
+              res
+                .status(200)
+                .json(
+                  Object.assign(
+                    { success: true, message: "Status successfully patched" },
+                    results
+                  )
+                );
+            }
+          }
         );
-        hwInventoryScript.stdout.on("data", (data) => {
-          let resultData = JSON.parse(data);
-          // console.log(resultData);
-          console.log("INFORMATION RECIEVED");
+      });
 
-          _db
-            .collection("componentInventory")
-            .findOne(
-              { serviceTag: resultData.SystemInformation.SKU },
-              (err, results) => {
-                if (err) {
-                  return console.log(err);
-                }
-                // If an entry with the same service tag is found, update the entry
-                if (results !== null) {
-                  _db.collection("componentInventory").updateOne(
-                    { serviceTag: resultData.SystemInformation.SKU },
-                    {
-                      $set: {
-                        data: resultData,
-                      },
-                    },
-                    (err) => {
-                      if (err) {
-                        return console.log(err);
-                      }
-                    }
+      // Patch comments value of server that has specified id
+      app.patch("/patchComments/:id", (req, res) => {
+        _db.collection(dbColl_Servers).updateOne(
+          { _id: mongoose.Types.ObjectId(req.params.id) },
+          {
+            $set: {
+              comments: req.body.comments,
+            },
+          },
+          (err, results) => {
+            if (err) {
+              res.status(500).json(Object.assign({ success: false }, err));
+            } else {
+              res
+                .status(200)
+                .json(
+                  Object.assign(
+                    { success: true, message: "Comment successfully patched" },
+                    results
+                  )
+                );
+            }
+          }
+        );
+      });
+
+      // Fetch servers checked out by a specified user
+      app.get("/getUserServers/:name", (req, res) => {
+        _db
+          .collection(dbColl_Servers)
+          .find({ status: req.params.name })
+          .toArray(function (err, resultArray) {
+            if (err) {
+              res.status(500).json({ success: false, message: err });
+            } else {
+              res.status(200).json({
+                success: true,
+                message: "User servers successfully fetched",
+                results: resultArray,
+              });
+            }
+          });
+      });
+
+      // Fetch names of all the folders listed for Factory Block on the XC Night Flyer Share
+      // app.get("/getIsoFiles", (req, res) => {
+      // let source = "";
+      app.get("/getFactoryBlock", (req, res) => {
+        // const myShellScript = exec("sh mapSharedDrive.sh ./");
+        // myShellScript.stdout.on("data", (data) => {
+        //   console.log("success:" + data);
+        // });
+        // myShellScript.stderr.on("data", (data) => {
+        //   console.error(data);
+        // });
+
+        let source = "/mnt/bmr";
+
+        const getDirectories = (source) =>
+          readdirSync(source, { withFileTypes: true })
+            .filter((dirent) => dirent.isDirectory())
+            .map((dirent) => {
+              return {
+                value: dirent.name,
+                label: dirent.name,
+              };
+            });
+
+        let optionsFactoryBlock = getDirectories(source);
+
+        res.status(200).json({
+          success: true,
+          message: "Factory Blocks successfully fetched",
+          results: optionsFactoryBlock,
+          // results: optionsFactoryBlock,
+        });
+      });
+
+      // Fetch names of .iso files from given directory path
+      app.get("/getBmrIso", (req, res) => {
+        let source = "/mnt/bmr";
+        const getIsoFiles = function (dirPath) {
+          let files = readdirSync(dirPath);
+          let arrayOfFiles = [];
+          files.map((name) => {
+            let extension = name.endsWith("iso") && name.includes("BMR3");
+            if (extension === true) {
+              arrayOfFiles.push(name);
+            }
+          });
+          return arrayOfFiles.map((fileName) => {
+            return {
+              value: fileName,
+              label: fileName,
+            };
+          });
+        };
+
+        console.log("SOURCE IS: " + source);
+        let optionsIsoFile = getIsoFiles(source);
+
+        res.status(200).json({
+          success: true,
+          message: "ISO file paths successfully fetched",
+          results: optionsIsoFile,
+        });
+      });
+
+      // Getting data from Front-END and passing it to the BMR Process Scripts
+      app.post("/bmrFactoryImaging", (req, res) => {
+        // console.log(req.body);
+
+        // Define bmr payload values for mounting network image
+        let ip_arr = req.body.selectedRowData.map((server) => {
+          return server.ip;
+        });
+        let image_name = req.body.selectedBmrIsoOption;
+        let block_name = req.body.selectedFactoryBlockOption;
+        let hypervisor_name = req.body.selectedHypervisorOption;
+
+        let bmr_payload_values = fs
+          .readFileSync("bmr_payload_values.txt")
+          .toString()
+          .replace(/\r/g, "")
+          .split("\n");
+        let share_ip = bmr_payload_values[0];
+        let share_name = bmr_payload_values[1];
+        let share_type = bmr_payload_values[2];
+        let bmr_username = bmr_payload_values[3];
+        let bmr_password = bmr_payload_values[4];
+
+        // Mount BMR ISO
+        // AZAT SCRIPTS START
+        if (
+          ip_arr !== "" &&
+          share_ip !== "" &&
+          share_name !== "" &&
+          share_type !== "" &&
+          image_name !== "" &&
+          bmr_username !== "" &&
+          bmr_password !== ""
+        ) {
+          bmrIsoProcess
+            .mountNetworkImageOnNodes(
+              ip_arr,
+              share_ip,
+              share_type,
+              share_name,
+              image_name,
+              bmr_username,
+              bmr_password
+            )
+            .then((response) => {
+              console.log(response.message);
+              // If ISO mount successful, make lclog comments with BMR info on each iDRAC
+              if (response.success) {
+                let lclogs = [];
+
+                // Define calls to lclog comment script for each server
+                for (const ipAddress of ip_arr) {
+                  // Wrap script calls in Promises and store them in 'lclogs' array
+                  lclogs.push(
+                    new Promise((resolve, reject) => {
+                      const myShellScript = exec(
+                        `sh bmr-parm.sh ${ipAddress} ${block_name} ${hypervisor_name} ${share_name} ${bmr_username} ${bmr_password}`
+                      );
+                      myShellScript.stdout.on("data", (data) => {
+                        // console.log(data);
+                        resolve({
+                          success: true,
+                          message: `Created lclog comment for server ${ipAddress} with seq id ${data}`,
+                        });
+                      });
+                      myShellScript.stderr.on("data", (data) => {
+                        // console.error(data);
+                        reject({
+                          success: false,
+                          message: data,
+                        });
+                      });
+                    })
                   );
+                }
 
-                  // If no entry with the same service tag is found, add a new entry
+                // Execute each lclog script call
+                Promise.all(lclogs).then((responses) => {
+                  console.log(responses);
+
+                  // After lclog comments finish, reboot each server
+                  bmrIsoProcess.rebootSelectedNodes(ip_arr).then((response) => {
+                    console.log(response.message);
+
+                    if (response.success) {
+                      res
+                        .status(200)
+                        .json({ success: true, message: response.message });
+                    } else {
+                      res
+                        .status(500)
+                        .json({ success: false, message: response.message });
+                    }
+                  });
+                });
+              } else {
+                res
+                  .status(500)
+                  .json({ success: false, message: response.message });
+              }
+            });
+        }
+      });
+
+      // Reset password of user with specified password-reset token
+      app.post("/reset", async (req, res) => {
+        _db
+          .collection(dbColl_Users)
+          .findOne({ username: req.body.username })
+          .then((user) => {
+            // Check if user exists
+            if (!user) {
+              return res
+                .status(404)
+                .json({ success: false, message: "Username not found" });
+            }
+
+            // Check if password is long enough
+            if (!Validator.isLength(req.body.password, { min: 6, max: 30 })) {
+              return res.status(404).json({
+                success: false,
+                message: "Password must be at least 6 characters",
+              });
+            }
+
+            // Check if passwords match
+            if (!Validator.equals(req.body.password, req.body.password2)) {
+              return res
+                .status(404)
+                .json({ success: false, message: "Passwords must match" });
+            }
+
+            // Update user record with new password
+            _db.collection(dbColl_Users).updateOne(
+              { username: req.body.username },
+              {
+                $set: {
+                  password: req.body.password,
+                },
+              },
+              function (err, results) {
+                if (err) {
+                  res.status(500).json(Object.assign({ success: false }, err));
                 } else {
-                  if (!err) {
-                    _db.collection("componentInventory").insertOne(
+                  res.status(200).json(
+                    Object.assign(
                       {
-                        serviceTag: resultData.SystemInformation.SKU,
-                        data: resultData,
+                        success: true,
+                        message: "Password successfully reset",
                       },
-                      { checkKeys: false },
-                      (err, res) => {
-                        if (err) {
-                          return console.log(err);
-                        }
-                      }
-                    );
-                  }
+                      results
+                    )
+                  );
                 }
               }
             );
+          });
+      });
 
-          // res.status(200).json({
-          //   success: true,
-          //   message: "Hw inventory complete",
-          //   results: data,
-          // });
-          // resolve({
-          //   success: true,
-          //   message: `Inventory Completed for server 100.80.144.152 with data: ${data}`,
-          // });
+      // **Component Inventory API Endpoint START**
+      app.post("/hardwareInventoryToDb", (req, res) => {
+        let msg = "";
+        let countPass = 0;
+        let countFail = 0;
+        let allQueries = [];
+        let queryPass = [];
+        let queryFail = [];
+
+        //Load the iDRAC IP list from a text file
+        let idracIps = readIpFile(ipFile);
+
+        //Loop through each iDRAC and get its inventory, then save it to db
+        idracIps.forEach(node_ip => {
+          allQueries.push(
+            getServerInventory(node_ip)
+              .then((response) => {
+                if (response.success) {
+                  countPass += 1;
+                  //Collect IPs of those iDRACs that returned data
+                  queryPass.push(node_ip);
+                  msg = `${node_ip} -> Inventory call completed successfully. `;
+                  //Get the string and parse it into JSON
+                  let jsonData = JSON.parse(response.message);
+                  // console.log("Checking for type of data after parsing: " + typeof jsonData); //debugging
+                  // console.log("Some piece of that JSON: " + jsonData.NetworkDeviceInformation.Name); //debugging
+
+                  //Call function to write query results to db
+                  writeToInventoryColl(_db, jsonData)
+                    .then(response => {
+                      if (response.success) {
+                        msg += `Write to db was successful.`;
+                        console.log(msg);
+                      } else {
+                        msg += `Write to db failed.`;
+                        console.log(msg);
+                      };
+                    })
+                    .catch(error => {
+                      console.log(`${node_ip} -> CATCH on writeToInventoryColl: ${error.statusText}`);
+                    })
+                } else {
+                  countFail += 1;
+                  //Collect IPs of those iDRACs that did not return data
+                  queryFail.push(node_ip);
+                  throw new Error();
+                }
+              })
+              .catch((error) => {
+                //Collect IPs of those iDRACs that failed query
+                queryFail.push(node_ip);
+                console.log(`${node_ip} -> CATCH on getServerInventory: ${error.statusText}`);
+                // res.json({ success: false, message: error.statusText, results: error.message });
+              })
+          );
+
         });
-        // hwInventoryScript.stderr.on("data", (data) => {
-        //   console.error(data);
-        //   // reject({
-        //   //   success: false,
-        //   //   message: data,
-        //   // });
-        // });
-      }
-    });
-    // **Component Inventory API Endpoint END**
-  }
-);
+        Promise.all(allQueries)
+          .then(() => {
+            console.log("All queries have been executed!");
+            res.json({
+              success: countPass > 0 ? true : false,
+              message: `Out of ${idracIps.length} servers queried, ${countPass} passed and ${countFail} failed. `,
+              results: { passed: queryPass, failed: queryFail }
+            });
+          })
+          .catch(error => {
+            console.log("Catch in Promise.all: " + error);
+          });
+
+      });
+      // **Component Inventory API Endpoint END**
+    }
+  )
+  .catch(error => {
+    console.log("ERROR: " + error.statusText);
+  });

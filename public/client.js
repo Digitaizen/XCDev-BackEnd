@@ -8,6 +8,7 @@ const hwInventoryButton = document.querySelector(".buttonHwInventory");
 
 // Function to display result of a query in the browser window
 function displayResult(result) {
+  console.log("Displaying results on the backend GUI.."); //debugging
   let node = document.createElement("li");
   let textNode = document.createTextNode(result, node);
   node.appendChild(textNode);
@@ -20,13 +21,24 @@ hwInventoryButton.addEventListener("click", () => {
   })
     .then((response) => response.json())
     .then((response) => {
+      console.log("Back from API call, response.success is:", response.success); //debugging
       if (response.success) {
-        console.log(response.message);
+        resultMsg = "Hardware inventory request: " + response.message + "Data recorded in db for: " + response.results.passed;
+        console.log(resultMsg);
+        // resultMsg = `Testing access to JSON elements: ${response.results.SystemInformation.SKU}, ${response.results.SystemInformation.Model},`; //debugging
+        // Output results of the request to the browser window
+        displayResult(resultMsg);
+        return;
       } else {
         resultMsg =
           "Hardware inventory request failed. Details: " + response.message;
         throw new Error(resultMsg);
       }
+    })
+    .catch((error) => {
+      console.log(error);
+      // Output results of the request to the browser window
+      displayResult(error);
     });
 });
 
