@@ -32,7 +32,6 @@ const { get } = require("http");
 const { readdirSync, statSync } = require("fs");
 let path = require("path");
 const bmrIsoProcess = require("./boot_to_BMR");
-const dJSON = require('dirty-json');
 const { response } = require("express");
 
 // Declare the globals ////////////////////////////////////////////////////////
