@@ -40,7 +40,8 @@ const dbName = "dev";
 const dbColl_Servers = "servers";
 const dbColl_Users = "users";
 const portNum = 8080;
-const ipFile = "./test_iDRAC_ips.txt";
+const ipFile = "./test_iDRAC_ips_3.txt";
+const bmrValues = "./bmr_payload_values.txt"
 const iDracLogin = "root";
 const iDracPassword = "calvin";
 const corsOptions = {
@@ -52,14 +53,14 @@ const corsOptions = {
 };
 
 // Define functions here //////////////////////////////////////////////////////
-// Grab iDRAC IPs from a text file
-function readIpFile(fName) {
-  let idracIps = fs
+// Read text file, remove spaces and empty lines, and return an array of text lines
+function readLDfile(fName) {
+  let linesArr = fs
     .readFileSync(fName)
     .toString()
-    .replace(/\r/g, "")
+    .replace(/^(?=\n)$|^\s*|\s*$|\n\n+/gm, "")
     .split("\n");
-  return idracIps;
+  return linesArr;
 }
 
 // Run a bash script to scan subnet for live iDRACs. Linux-only.
@@ -713,7 +714,7 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 })
       app.post("/postServers", (req, res) => {
         res.connection.setTimeout(0);
 
-        let idracIps = readIpFile(ipFile);
+        let idracIps = readLDfile(ipFile);
         console.log(idracIps);
         return getRedfishData(idracIps, _db);
       });
@@ -896,16 +897,20 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 })
         let block_name = req.body.selectedFactoryBlockOption;
         let hypervisor_name = req.body.selectedHypervisorOption;
 
-        let bmr_payload_values = fs
-          .readFileSync("bmr_payload_values.txt")
-          .toString()
-          .replace(/\r/g, "")
-          .split("\n");
-        let share_ip = bmr_payload_values[0];
-        let share_name = bmr_payload_values[1];
-        let share_type = bmr_payload_values[2];
-        let bmr_username = bmr_payload_values[3];
-        let bmr_password = bmr_payload_values[4];
+        // let bmr_payload_values = fs
+        //   .readFileSync("bmr_payload_values.txt")
+        //   .toString()
+        //   .replace(/\r/g, "")
+        //   .split("\n");
+        // let share_ip = bmr_payload_values[0];
+        // let share_name = bmr_payload_values[1];
+        // let share_type = bmr_payload_values[2];
+        // let bmr_username = bmr_payload_values[3];
+        // let bmr_password = bmr_payload_values[4];
+
+        // Get BMR info from a text file
+        [share_ip, share_name, share_type, bmr_username, bmr_password] = readLDfile(bmrValues);
+
 
         // Mount BMR ISO
         // AZAT SCRIPTS START
@@ -1053,7 +1058,7 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 })
         let queryFail = [];
 
         //Load the iDRAC IP list from a text file
-        let idracIps = readIpFile(ipFile);
+        let idracIps = readLDfile(ipFile);
 
         //Loop through each iDRAC and get its inventory, then save it to db
         idracIps.forEach(node_ip => {
@@ -1067,8 +1072,6 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 })
                   msg = `${node_ip} -> Inventory call completed successfully. `;
                   //Get the string and parse it into JSON
                   let jsonData = JSON.parse(response.message);
-                  // console.log("Checking for type of data after parsing: " + typeof jsonData); //debugging
-                  // console.log("Some piece of that JSON: " + jsonData.NetworkDeviceInformation.Name); //debugging
 
                   //Call function to write query results to db
                   writeToInventoryColl(_db, jsonData)
@@ -1088,6 +1091,8 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 })
                   countFail += 1;
                   //Collect IPs of those iDRACs that did not return data
                   queryFail.push(node_ip);
+                  msg += `Inventory call on ${node_ip} failed.`;
+                  console.log(msg);
                   throw new Error();
                 }
               })
