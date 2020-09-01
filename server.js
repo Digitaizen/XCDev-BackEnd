@@ -79,6 +79,28 @@ function scanSubnet() {
   });
 }
 
+function getComponentDataArray(dbObject) {
+  return new Promise((resolve, reject) => {
+    dbObject
+      .collection("inventory")
+      .find()
+      .toArray(function (err, docs) {
+        if (err) {
+          reject({
+            success: false,
+            message: "Error in fetching data from component inventory: " + err,
+          });
+        } else {
+          resolve({
+            success: true,
+            message: "Successfully fetched data from component inventory",
+            resultArray: docs,
+          });
+        }
+      });
+  });
+}
+
 /**
  * Performs fetch call to "url", allows "n" retries before returning error
  * @return {Response} response containing data from the url
@@ -971,5 +993,22 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
           );
         });
     });
+
+    // **Fetch Component Inventory API Endpoint START**
+    app.get("/getHardwareInventory", (req, res) => {
+      getComponentDataArray(_db).then((response) => {
+        if (response.success) {
+          console.log(response.message);
+          res.status(200).json({
+            success: true,
+            message: response.message,
+            resultArray: response.resultArray,
+          });
+        } else {
+          res.status(500).json({ success: false, message: response.message });
+        }
+      });
+    });
+    // **Fetch Component Inventory API Endpoint END**
   }
 );
