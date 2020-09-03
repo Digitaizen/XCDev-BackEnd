@@ -32,11 +32,8 @@ const { get } = require("http");
 const { readdirSync, statSync } = require("fs");
 let path = require("path");
 const bmrIsoProcess = require("./boot_to_BMR");
-<<<<<<< HEAD
 const ip_scan = require("./iDRAC_IP_Scan");
-=======
 const { response } = require("express");
->>>>>>> Dev
 
 // Declare the globals ////////////////////////////////////////////////////////
 const dbUrl = "mongodb://localhost:27017";
@@ -44,14 +41,11 @@ const dbName = "dev";
 const dbColl_Servers = "servers";
 const dbColl_Users = "users";
 const portNum = 8080;
-<<<<<<< HEAD
-const lab_ip_range = '100.80.144.0-100.80.148.255';
+const lab_ip_range = "100.80.144.0-100.80.148.255";
 const file_idracs = "IPrangeScan-iDRACs.txt";
 const file_others = "IPrangeScan-Others.txt";
-=======
 const ipFile = "./active_iDRAC_ips.txt";
 const bmrValues = "./bmr_payload_values.txt";
->>>>>>> Dev
 const iDracLogin = "root";
 const iDracPassword = "calvin";
 const corsOptions = {
@@ -214,7 +208,8 @@ async function getRedfishData(idracIps, db) {
       // Define the URLs to be fetched from
       let v1Url = "https://" + item + "/redfish/v1";
       let fwUrl = "https://" + item + "/redfish/v1/Managers/iDRAC.Embedded.1";
-      let systemUrl = "https://" + item + "/redfish/v1/Systems/System.Embedded.1";
+      let systemUrl =
+        "https://" + item + "/redfish/v1/Systems/System.Embedded.1";
       let locationUrl =
         "https://" +
         item +
@@ -748,49 +743,60 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 })
       //   });
 
       let set_of_ips = fs;
-      ip_scan.findIdracsInIpRange(lab_ip_range)
-        .then(response => {
+      ip_scan
+        .findIdracsInIpRange(lab_ip_range)
+        .then((response) => {
           if (response.success) {
-            set_of_ips.writeFile(file_idracs, response.results.idracs.join('\n'), err => {
-              if (err) {
-                console.error(`Error writing to file: ${err}`);
-                return;
+            set_of_ips.writeFile(
+              file_idracs,
+              response.results.idracs.join("\n"),
+              (err) => {
+                if (err) {
+                  console.error(`Error writing to file: ${err}`);
+                  return;
+                }
+                //file written successfully
+                console.log(
+                  `Logged: ${response.results.idracs.length} found live iDRACs to "${file_idracs}"`
+                );
               }
-              //file written successfully
-              console.log(`Logged: ${response.results.idracs.length} found live iDRACs to "${file_idracs}"`);
-            });
-            set_of_ips.writeFile(file_others, response.results.others.join('\n'), err => {
-              if (err) {
-                console.error(`Error writing to file: ${err}`);
-                return;
+            );
+            set_of_ips.writeFile(
+              file_others,
+              response.results.others.join("\n"),
+              (err) => {
+                if (err) {
+                  console.error(`Error writing to file: ${err}`);
+                  return;
+                }
+                //file written successfully
+                console.log(
+                  `Logged: ${response.results.others.length} other network devices found to "${file_others}"`
+                );
               }
-              //file written successfully
-              console.log(`Logged: ${response.results.others.length} other network devices found to "${file_others}"`);
-            });
+            );
             res.json({
               status: true,
               message: `Scan is complete: ${response.results.idracs.length} servers were found and logged to "${file_idracs}".`,
             });
           } else {
-            console.log(`findIdracsInIpRange else response: ${response.results}`);
+            console.log(
+              `findIdracsInIpRange else response: ${response.results}`
+            );
             // throw new Error();
           }
         })
-        .catch(error => {
+        .catch((error) => {
           console.log(`Caught error in findIdracsInIpRange: ${error.results}`);
           res.json({ status: false, message: error.message });
-        })
+        });
     });
 
     // Make call to iDRAC Redfish API and save the response data in MongoDB collection
     app.post("/postServers", (req, res) => {
       res.connection.setTimeout(0);
 
-<<<<<<< HEAD
-      let idracIps = readIpFile(file_idracs);
-=======
       let idracIps = readLDfile(ipFile);
->>>>>>> Dev
       console.log(idracIps);
       return getRedfishData(idracIps, _db);
     });
@@ -884,17 +890,13 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 })
       _db
         .collection(dbColl_Servers)
         .find({ status: req.params.name })
-<<<<<<< HEAD
-        .toArray(function(err, servers) {
-=======
         .toArray(function (err, resultArray) {
->>>>>>> Dev
           if (err) {
             res.status(500).json({ success: false, message: err });
           } else {
             // If firmware version is older than 3.21.26.22, exclude server from results
             let resultArray = servers.filter(
-              server =>
+              (server) =>
                 parseInt(server.firmwareVersion.split(".").join("")) >= 3212622
             );
             // Return array of servers belonging to specified user
