@@ -32,7 +32,11 @@ const { get } = require("http");
 const { readdirSync, statSync } = require("fs");
 let path = require("path");
 const bmrIsoProcess = require("./boot_to_BMR");
+<<<<<<< HEAD
 const ip_scan = require("./iDRAC_IP_Scan");
+=======
+const { response } = require("express");
+>>>>>>> Dev
 
 // Declare the globals ////////////////////////////////////////////////////////
 const dbUrl = "mongodb://localhost:27017";
@@ -40,9 +44,14 @@ const dbName = "dev";
 const dbColl_Servers = "servers";
 const dbColl_Users = "users";
 const portNum = 8080;
+<<<<<<< HEAD
 const lab_ip_range = '100.80.144.0-100.80.148.255';
 const file_idracs = "IPrangeScan-iDRACs.txt";
 const file_others = "IPrangeScan-Others.txt";
+=======
+const ipFile = "./active_iDRAC_ips.txt";
+const bmrValues = "./bmr_payload_values.txt";
+>>>>>>> Dev
 const iDracLogin = "root";
 const iDracPassword = "calvin";
 const corsOptions = {
@@ -54,14 +63,14 @@ const corsOptions = {
 };
 
 // Define functions here //////////////////////////////////////////////////////
-// Grab iDRAC IPs from a text file
-function readIpFile(fName) {
-  let idracIps = fs
+// Read text file, remove spaces and empty lines, and return an array of text lines
+function readLDfile(fName) {
+  let linesArr = fs
     .readFileSync(fName)
     .toString()
-    .replace(/\r/g, "")
+    .replace(/^(?=\n)$|^\s*|\s*$|\n\n+/gm, "")
     .split("\n");
-  return idracIps;
+  return linesArr;
 }
 
 // Run a bash script to scan subnet for live iDRACs. Linux-only.
@@ -81,6 +90,100 @@ function readIpFile(fName) {
 //     );
 //   });
 // }
+
+function getServerInventory(node_ip) {
+  return new Promise((resolve, reject) => {
+    console.log(`${node_ip} -> getServerInventory function called..`);
+    // Execute the Python script to get iDRAC HW inventory
+    exec(
+      `python get_iDRAC_Inventory.py -ip ${node_ip} -u ${iDracLogin} -p ${iDracPassword} -a y`,
+      (err, stdout, stderr) => {
+        if (err || stderr) {
+          reject({ success: false, message: stderr });
+        } else {
+          resolve({ success: true, message: stdout });
+        }
+      }
+    );
+  });
+}
+
+function writeToInventoryColl(dbObject, jsonObject) {
+  return new Promise((resolve, reject) => {
+    dbObject
+      .collection("inventory")
+      .findOne({ serviceTag: jsonObject.SystemInformation.SKU }, (err, res) => {
+        if (err) {
+          console.log(err);
+        }
+        // If an entry with the same service tag is found, update the entry
+        if (res !== null) {
+          dbObject.collection("inventory").updateOne(
+            { serviceTag: jsonObject.SystemInformation.SKU },
+            {
+              $set: {
+                data: jsonObject,
+              },
+            },
+            (err, res) => {
+              if (err) {
+                reject({
+                  success: false,
+                  message: "Error on updating record: " + err,
+                });
+              } else {
+                resolve({ success: true, message: "Updated the record." });
+              }
+            }
+          );
+
+          // If no entry with the same service tag is found, add a new entry
+        } else {
+          if (!err) {
+            dbObject.collection("inventory").insertOne(
+              {
+                serviceTag: jsonObject.SystemInformation.SKU,
+                data: jsonObject,
+              },
+              { checkKeys: false },
+              (err, res) => {
+                if (err) {
+                  reject({
+                    success: false,
+                    message: "Error on inserting record: " + err,
+                  });
+                } else {
+                  resolve({ success: true, message: "Inserted new record." });
+                }
+              }
+            );
+          }
+        }
+      });
+  });
+}
+
+function getComponentDataArray(dbObject) {
+  return new Promise((resolve, reject) => {
+    dbObject
+      .collection("inventory")
+      .find()
+      .toArray(function (err, docs) {
+        if (err) {
+          reject({
+            success: false,
+            message: "Error in fetching data from component inventory: " + err,
+          });
+        } else {
+          resolve({
+            success: true,
+            message: "Successfully fetched data from component inventory",
+            resultArray: docs,
+          });
+        }
+      });
+  });
+}
 
 /**
  * Performs fetch call to "url", allows "n" retries before returning error
@@ -450,8 +553,8 @@ const app = express();
 app.use(cors(corsOptions));
 
 // Connect to the database, start the server, query iDRACs via RedFish, and populate db
-MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
-  (client) => {
+MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 })
+  .then((client) => {
     const _db = client.db(dbName);
     console.log(`Connected to ${dbName}`);
 
@@ -683,7 +786,11 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
     app.post("/postServers", (req, res) => {
       res.connection.setTimeout(0);
 
+<<<<<<< HEAD
       let idracIps = readIpFile(file_idracs);
+=======
+      let idracIps = readLDfile(ipFile);
+>>>>>>> Dev
       console.log(idracIps);
       return getRedfishData(idracIps, _db);
     });
@@ -866,21 +973,25 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
       let block_name = req.body.selectedFactoryBlockOption;
       let hypervisor_name = req.body.selectedHypervisorOption;
 
-      let bmr_payload_values = fs
-        .readFileSync("bmr_payload_values.txt")
-        .toString()
-        .replace(/\r/g, "")
-        .split("\n");
-      let share_ip = bmr_payload_values[0];
-      let share_name = bmr_payload_values[1];
-      let share_type = bmr_payload_values[2];
-      let bmr_username = bmr_payload_values[3];
-      let bmr_password = bmr_payload_values[4];
+      // let bmr_payload_values = fs
+      //   .readFileSync("bmr_payload_values.txt")
+      //   .toString()
+      //   .replace(/\r/g, "")
+      //   .split("\n");
+      // let share_ip = bmr_payload_values[0];
+      // let share_name = bmr_payload_values[1];
+      // let share_type = bmr_payload_values[2];
+      // let bmr_username = bmr_payload_values[3];
+      // let bmr_password = bmr_payload_values[4];
 
-      // console.log(bmr_payload_values);
-
-      // Define values to add to iDRAC LCLOG files
-      // let share_name = "/mnt/bmr";
+      // Get BMR info from a text file
+      [
+        share_ip,
+        share_name,
+        share_type,
+        bmr_username,
+        bmr_password,
+      ] = readLDfile(bmrValues);
 
       // Mount BMR ISO
       // AZAT SCRIPTS START
@@ -905,56 +1016,62 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
           )
           .then((response) => {
             console.log(response.message);
+            // If ISO mount successful, make lclog comments with BMR info on each iDRAC
             if (response.success) {
-              // Invoke Bash Script to add entries to iDRAC's LCLOG file
-              for (const ipAddress of ip_arr) {
-                console.log("BMR SHELL SCRIPT LOOP HERE");
+              let lclogs = [];
 
-                const myShellScript = exec(
-                  `sh bmr-parm.sh ${ipAddress} ${block_name} ${hypervisor_name} ${share_name} ${bmr_username} ${bmr_password}`
+              // Define calls to lclog comment script for each server
+              for (const ipAddress of ip_arr) {
+                // Wrap script calls in Promises and store them in 'lclogs' array
+                lclogs.push(
+                  new Promise((resolve, reject) => {
+                    const myShellScript = exec(
+                      `sh bmr-parm.sh ${ipAddress} ${block_name} ${hypervisor_name} ${share_name} ${bmr_username} ${bmr_password}`
+                    );
+                    myShellScript.stdout.on("data", (data) => {
+                      // console.log(data);
+                      resolve({
+                        success: true,
+                        message: `Created lclog comment for server ${ipAddress} with seq id ${data}`,
+                      });
+                    });
+                    myShellScript.stderr.on("data", (data) => {
+                      // console.error(data);
+                      reject({
+                        success: false,
+                        message: data,
+                      });
+                    });
+                  })
                 );
-                myShellScript.stdout.on("data", (data) => {
-                  console.log(`success ${data}`);
-                  // res.status(200).json({
-                  //   success: true,
-                  //   message:
-                  //     "Successfully completed BMR factory imaging process",
-                  // });
-                });
-                myShellScript.stderr.on("data", (data) => {
-                  console.error(data);
-                  // res.status(500).json({
-                  //   success: false,
-                  //   message: data,
-                  // });
-                });
               }
+
+              // Execute each lclog script call
+              Promise.all(lclogs).then((responses) => {
+                console.log(responses);
+
+                // After lclog comments finish, reboot each server
+                bmrIsoProcess.rebootSelectedNodes(ip_arr).then((response) => {
+                  console.log(response.message);
+
+                  if (response.success) {
+                    res
+                      .status(200)
+                      .json({ success: true, message: response.message });
+                  } else {
+                    res
+                      .status(500)
+                      .json({ success: false, message: response.message });
+                  }
+                });
+              });
             } else {
-              // res
-              //   .status(500)
-              //   .json({ success: false, message: response.message });
+              res
+                .status(500)
+                .json({ success: false, message: response.message });
             }
           });
       }
-
-      // CHECK SUCCESS FROM RESPONSE
-
-      // ID RESPONSE = SUCCESS
-      // THEN START AHMAD SCRIPT
-      // Invoke Bash Script to add entries to iDRAC's LCLOG file
-      // for (const ipAddress of ip_arr) {
-      //   console.log("BMR SHELL SCRIPT LOOP HERE");
-
-      //   const myShellScript = exec(
-      //     `sh bmr-parm.sh ${ipAddress} ${block_name} ${hypervisor_name} ${share_name} ./`
-      //   );
-      //   myShellScript.stdout.on("data", (data) => {
-      //     console.log(`success ${data}`);
-      //   });
-      //   myShellScript.stderr.on("data", (data) => {
-      //     console.error(data);
-      //   });
-      // }
     });
 
     // Reset password of user with specified password-reset token
@@ -1011,5 +1128,99 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 }).then(
           );
         });
     });
-  }
-);
+
+    // **Component Inventory API Endpoint START**
+    app.post("/hardwareInventoryToDb", (req, res) => {
+      let msg = "";
+      let countPass = 0;
+      let countFail = 0;
+      let allQueries = [];
+      let queryPass = [];
+      let queryFail = [];
+
+      //Load the iDRAC IP list from a text file
+      let idracIps = readLDfile(ipFile);
+
+      //Loop through each iDRAC and get its inventory, then save it to db
+      idracIps.forEach((node_ip) => {
+        allQueries.push(
+          getServerInventory(node_ip)
+            .then((response) => {
+              if (response.success) {
+                countPass += 1;
+                //Collect IPs of those iDRACs that returned data
+                queryPass.push(node_ip);
+                msg = `${node_ip} -> Inventory call completed successfully. `;
+                //Get the string and parse it into JSON
+                let jsonData = JSON.parse(response.message);
+
+                //Call function to write query results to db
+                writeToInventoryColl(_db, jsonData)
+                  .then((response) => {
+                    if (response.success) {
+                      msg += `Write to db was successful.`;
+                      console.log(msg);
+                    } else {
+                      msg += `Write to db failed.`;
+                      console.log(msg);
+                    }
+                  })
+                  .catch((error) => {
+                    console.log(
+                      `${node_ip} -> CATCH on writeToInventoryColl: ${error.statusText}`
+                    );
+                  });
+              } else {
+                countFail += 1;
+                //Collect IPs of those iDRACs that did not return data
+                queryFail.push(node_ip);
+                msg += `Inventory call on ${node_ip} failed.`;
+                console.log(msg);
+                throw new Error();
+              }
+            })
+            .catch((error) => {
+              //Collect IPs of those iDRACs that failed query
+              queryFail.push(node_ip);
+              console.log(
+                `${node_ip} -> CATCH on getServerInventory: ${error.statusText}`
+              );
+              // res.json({ success: false, message: error.statusText, results: error.message });
+            })
+        );
+      });
+      Promise.all(allQueries)
+        .then(() => {
+          console.log("All queries have been executed!");
+          res.json({
+            success: countPass > 0 ? true : false,
+            message: `Out of ${idracIps.length} servers queried, ${countPass} passed and ${countFail} failed. `,
+            results: { passed: queryPass, failed: queryFail },
+          });
+        })
+        .catch((error) => {
+          console.log("Catch in Promise.all: " + error);
+        });
+    });
+    // **Component Inventory API Endpoint END**
+
+    // **Fetch Component Inventory API Endpoint START**
+    app.get("/getHardwareInventory", (req, res) => {
+      getComponentDataArray(_db).then((response) => {
+        if (response.success) {
+          console.log(response.message);
+          res.status(200).json({
+            success: true,
+            message: response.message,
+            resultArray: response.resultArray,
+          });
+        } else {
+          res.status(500).json({ success: false, message: response.message });
+        }
+      });
+    });
+    // **Fetch Component Inventory API Endpoint END**
+  })
+  .catch((error) => {
+    console.log("ERROR: " + error.statusText);
+  });
