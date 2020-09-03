@@ -4,34 +4,69 @@ console.log("Client side code running");
 const fetchButton = document.querySelector(".buttonFetch");
 const readButton = document.querySelector(".buttonRead");
 const scanButton = document.querySelector(".btnRunIPScan");
+const hwInventoryButton = document.querySelector(".buttonHwInventory");
 
 // Function to display result of a query in the browser window
 function displayResult(result) {
+  console.log("Displaying results on the backend GUI.."); //debugging
   let node = document.createElement("li");
   let textNode = document.createTextNode(result, node);
   node.appendChild(textNode);
   document.getElementById("serverList").appendChild(node);
 }
 
+hwInventoryButton.addEventListener("click", () => {
+  fetch("/hardwareInventoryToDb", {
+    method: "POST",
+  })
+    .then((response) => response.json())
+    .then((response) => {
+      console.log("Back from API call, response.success is:", response.success); //debugging
+      if (response.success) {
+        resultMsg = "Hardware inventory request: " + response.message + "Data recorded in db for: " + response.results.passed;
+        console.log(resultMsg);
+        // resultMsg = `Testing access to JSON elements: ${response.results.SystemInformation.SKU}, ${response.results.SystemInformation.Model},`; //debugging
+        // Output results of the request to the browser window
+        displayResult(resultMsg);
+        return;
+      } else {
+        resultMsg =
+          "Hardware inventory request failed. Details: " + response.message;
+        throw new Error(resultMsg);
+      }
+    })
+    .catch((error) => {
+      console.log(error);
+      // Output results of the request to the browser window
+      displayResult(error);
+    });
+});
+
 // Set logic for each of the buttons //////////////////////////////////////////
 scanButton.addEventListener("click", () => {
+  event.preventDefault();
   console.log("Scan button clicked, calling API..");
   let resultMsg = "";
   // Notify user about wait-time in the browser window
   displayResult(
-    "Scan initiated. Please, wait as it can take approximately 3+ minutes to complete, unless there's a failure."
+    "Scan initiated. Please, wait as it takes a few minutes to complete, unless there's a failure."
   );
+  // Notify user about unusually long scan time
+  setTimeout(() => {
+    console.log("..waiting on response from some servers, still scanning..");
+    displayResult("..Still waiting on some servers, please be patient.");
+  }, 186000);
 
   fetch("/findServers", {
-    method: "POST"
+    method: "POST",
   })
-    .then(response => response.json())
-    .then(response => {
+    .then((response) => response.json())
+    .then((response) => {
       console.log("Back from API call, response.status is:", response.status);
       if (response.status) {
-        console.log("Now updating the database..");
+        // console.log("Now updating the database..");
         // Now, feed the new IP file to the backend by triggering the fetch button
-        fetchButton.click();
+        // fetchButton.click();
         resultMsg = response.message;
         // Output results of the request to the browser window
         displayResult(resultMsg);
@@ -41,28 +76,27 @@ scanButton.addEventListener("click", () => {
         throw new Error(resultMsg);
       }
     })
-    .catch(error => {
+    .catch((error) => {
       console.log(error);
       // Output results of the request to the browser window
       displayResult(error);
     });
 });
 
-// Set logic for each of the buttons //////////////////////////////////////////
 fetchButton.addEventListener("click", () => {
   console.log("Fetch button clicked");
 
   fetch("/postServers", {
-    method: "POST"
+    method: "POST",
   })
-    .then(response => {
+    .then((response) => {
       if (response.ok) {
         console.log("server data added");
         return;
       }
       throw new Error("Request Failed");
     })
-    .catch(error => {
+    .catch((error) => {
       console.log(error);
     });
 });
@@ -71,17 +105,17 @@ readButton.addEventListener("click", () => {
   console.log("Read button clicked");
 
   fetch("/getServers", {
-    method: "GET"
+    method: "GET",
   })
-    .then(response => {
+    .then((response) => {
       if (response.ok) {
         console.log("server data retrieved");
         return response.json();
       }
       throw new Error("Request Failed");
     })
-    .then(data => {
-      data.map(item => {
+    .then((data) => {
+      data.map((item) => {
         var node = document.createElement("LI");
         var textNode = document.createTextNode(
           String(
@@ -92,7 +126,7 @@ readButton.addEventListener("click", () => {
         document.getElementById("serverList").appendChild(node);
       });
     })
-    .catch(error => {
+    .catch((error) => {
       console.log(error);
     });
 });
