@@ -29,6 +29,7 @@
     "express": "^4.17.1",
     "express-flash": "0.0.2",
     "express-session": "^1.17.1",
+    "get-ip-range": "^2.1.0",
     "https": "^1.0.0",
     "is-empty": "^1.2.0",
     "jsonwebtoken": "^8.5.1",
