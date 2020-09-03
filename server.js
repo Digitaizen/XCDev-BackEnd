@@ -890,7 +890,7 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 })
       _db
         .collection(dbColl_Servers)
         .find({ status: req.params.name })
-        .toArray(function (err, resultArray) {
+        .toArray(function (err, servers) {
           if (err) {
             res.status(500).json({ success: false, message: err });
           } else {
