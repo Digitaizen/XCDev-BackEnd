@@ -44,12 +44,18 @@ hwInventoryButton.addEventListener("click", () => {
 
 // Set logic for each of the buttons //////////////////////////////////////////
 scanButton.addEventListener("click", () => {
+  event.preventDefault();
   console.log("Scan button clicked, calling API..");
   let resultMsg = "";
   // Notify user about wait-time in the browser window
   displayResult(
-    "Scan initiated. Please, wait as it can take approximately 3+ minutes to complete, unless there's a failure."
+    "Scan initiated. Please, wait as it takes a few minutes to complete, unless there's a failure."
   );
+  // Notify user about unusually long scan time
+  setTimeout(() => {
+    console.log("..waiting on response from some servers, still scanning..");
+    displayResult("..Still waiting on some servers, please be patient.");
+  }, 186000);
 
   fetch("/findServers", {
     method: "POST",
@@ -58,9 +64,9 @@ scanButton.addEventListener("click", () => {
     .then((response) => {
       console.log("Back from API call, response.status is:", response.status);
       if (response.status) {
-        console.log("Now updating the database..");
+        // console.log("Now updating the database..");
         // Now, feed the new IP file to the backend by triggering the fetch button
-        fetchButton.click();
+        // fetchButton.click();
         resultMsg = response.message;
         // Output results of the request to the browser window
         displayResult(resultMsg);
@@ -77,7 +83,6 @@ scanButton.addEventListener("click", () => {
     });
 });
 
-// Set logic for each of the buttons //////////////////////////////////////////
 fetchButton.addEventListener("click", () => {
   console.log("Fetch button clicked");
 

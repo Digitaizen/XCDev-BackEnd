@@ -32,7 +32,11 @@ const { get } = require("http");
 const { readdirSync, statSync } = require("fs");
 let path = require("path");
 const bmrIsoProcess = require("./boot_to_BMR");
+<<<<<<< HEAD
+const ip_scan = require("./iDRAC_IP_Scan");
+=======
 const { response } = require("express");
+>>>>>>> Dev
 
 // Declare the globals ////////////////////////////////////////////////////////
 const dbUrl = "mongodb://localhost:27017";
@@ -40,8 +44,14 @@ const dbName = "dev";
 const dbColl_Servers = "servers";
 const dbColl_Users = "users";
 const portNum = 8080;
+<<<<<<< HEAD
+const lab_ip_range = '100.80.144.0-100.80.148.255';
+const file_idracs = "IPrangeScan-iDRACs.txt";
+const file_others = "IPrangeScan-Others.txt";
+=======
 const ipFile = "./active_iDRAC_ips.txt";
 const bmrValues = "./bmr_payload_values.txt";
+>>>>>>> Dev
 const iDracLogin = "root";
 const iDracPassword = "calvin";
 const corsOptions = {
@@ -64,22 +74,22 @@ function readLDfile(fName) {
 }
 
 // Run a bash script to scan subnet for live iDRACs. Linux-only.
-function scanSubnet() {
-  return new Promise((resolve, reject) => {
-    console.log("Scan subnet function called..");
-    // Execute a process to run the script asynchronosly
-    exec(
-      "./find-idracs-on-subnet.sh 100.80.144.0/21>active_iDRAC_ips.txt",
-      (err, stdout, stderr) => {
-        if (err || stderr) {
-          reject({ message: stderr });
-        } else {
-          resolve({ message: "success" });
-        }
-      }
-    );
-  });
-}
+// function scanSubnet() {
+//   return new Promise((resolve, reject) => {
+//     console.log("Scan subnet function called..");
+//     // Execute a process to run the script asynchronosly
+//     exec(
+//       "./find-idracs-on-subnet.sh 100.80.144.0/21>active_iDRAC_ips.txt",
+//       (err, stdout, stderr) => {
+//         if (err || stderr) {
+//           reject({ message: stderr });
+//         } else {
+//           resolve({ message: "success" });
+//         }
+//       }
+//     );
+//   });
+// }
 
 function getServerInventory(node_ip) {
   return new Promise((resolve, reject) => {
@@ -192,236 +202,240 @@ const fetch_retry = (url, options, n) =>
  * @param {array} idracIps array containing IP addresses of active iDRACs
  */
 async function getRedfishData(idracIps, db) {
-  // Initialize count of servers being added/updated to db
-  let serverCount = 0;
+  try {
+    // Initialize count of servers being added/updated to db
+    let serverCount = 0;
 
-  // Iterate through iDRAC IPs
-  idracIps.forEach((item) => {
-    // Declare object that will store the iDRAC's data
-    let redfishDataObject = {};
+    // Iterate through iDRAC IPs
+    idracIps.forEach((item) => {
+      // Declare object that will store the iDRAC's data
+      let redfishDataObject = {};
 
-    // Define the URLs to be fetched from
-    let v1Url = "https://" + item + "/redfish/v1";
-    let fwUrl = "https://" + item + "/redfish/v1/Managers/iDRAC.Embedded.1";
-    let systemUrl = "https://" + item + "/redfish/v1/Systems/System.Embedded.1";
-    let locationUrl =
-      "https://" +
-      item +
-      "/redfish/v1/Managers/System.Embedded.1/Attributes?$select=ServerTopology.*";
-    let codeNameUrl =
-      "https://" +
-      item +
-      "/redfish/v1/Managers/iDRAC.Embedded.1/Attributes?$select=CurrentNIC.*";
+      // Define the URLs to be fetched from
+      let v1Url = "https://" + item + "/redfish/v1";
+      let fwUrl = "https://" + item + "/redfish/v1/Managers/iDRAC.Embedded.1";
+      let systemUrl = "https://" + item + "/redfish/v1/Systems/System.Embedded.1";
+      let locationUrl =
+        "https://" +
+        item +
+        "/redfish/v1/Managers/System.Embedded.1/Attributes?$select=ServerTopology.*";
+      let codeNameUrl =
+        "https://" +
+        item +
+        "/redfish/v1/Managers/iDRAC.Embedded.1/Attributes?$select=CurrentNIC.*";
 
-    // Construct options to be used in fetch call
-    const agent = new https.Agent({
-      rejectUnauthorized: false,
-    });
+      // Construct options to be used in fetch call
+      const agent = new https.Agent({
+        rejectUnauthorized: false,
+      });
 
-    let options = {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Basic ${base64.encode(
-          `${iDracLogin}:${iDracPassword}`
-        )}`,
-      },
-      agent: agent,
-    };
+      let options = {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Basic ${base64.encode(
+            `${iDracLogin}:${iDracPassword}`
+          )}`,
+        },
+        agent: agent,
+      };
 
-    // Make fetch call on v1 URL
-    fetch_retry(v1Url, options, 3)
-      .then((response) => {
-        if (response.ok) {
-          return response.json();
-        } else {
-          return Promise.reject(response);
-        }
-      })
-      .then((v1Data) => {
-        // Store data from v1 URL in iDRAC data object
-        redfishDataObject["v1"] = v1Data;
+      // Make fetch call on v1 URL
+      fetch_retry(v1Url, options, 3)
+        .then((response) => {
+          if (response.ok) {
+            return response.json();
+          } else {
+            return Promise.reject(response);
+          }
+        })
+        .then((v1Data) => {
+          // Store data from v1 URL in iDRAC data object
+          redfishDataObject["v1"] = v1Data;
 
-        // Make fetch call on firmware URL
-        return fetch_retry(fwUrl, options, 3);
-      })
-      .then((response) => {
-        if (response.ok) {
-          return response.json();
-        } else {
-          return Promise.reject(response);
-        }
-      })
-      .then((fwData) => {
-        // Store data from fw URL in iDRAC data object
-        redfishDataObject["fw"] = fwData;
+          // Make fetch call on firmware URL
+          return fetch_retry(fwUrl, options, 3);
+        })
+        .then((response) => {
+          if (response.ok) {
+            return response.json();
+          } else {
+            return Promise.reject(response);
+          }
+        })
+        .then((fwData) => {
+          // Store data from fw URL in iDRAC data object
+          redfishDataObject["fw"] = fwData;
 
-        // Make fetch call on systems URL
-        return fetch_retry(systemUrl, options, 3);
-      })
-      .then((response) => {
-        if (response.ok) {
-          return response.json();
-        } else {
-          return Promise.reject(response);
-        }
-      })
-      .then((systemData) => {
-        // Store data from systems URL in iDRAC data object
-        redfishDataObject["System"] = systemData;
+          // Make fetch call on systems URL
+          return fetch_retry(systemUrl, options, 3);
+        })
+        .then((response) => {
+          if (response.ok) {
+            return response.json();
+          } else {
+            return Promise.reject(response);
+          }
+        })
+        .then((systemData) => {
+          // Store data from systems URL in iDRAC data object
+          redfishDataObject["System"] = systemData;
 
-        /**
-         * DELLXCDEV-113
-         *
-         * Location scanning logic commented out in lines 161-186, 206-211, 224-248, 258, 271, 282
-         */
-        //   // Check if iDRAC is 14G or higher
-        //   let systemGeneration = redfishDataObject.System.hasOwnProperty("Oem")
-        //     ? redfishDataObject.System.Oem.Dell.DellSystem.SystemGeneration
-        //     : "";
+          /**
+           * DELLXCDEV-113
+           *
+           * Location scanning logic commented out in lines 161-186, 206-211, 224-248, 258, 271, 282
+           */
+          //   // Check if iDRAC is 14G or higher
+          //   let systemGeneration = redfishDataObject.System.hasOwnProperty("Oem")
+          //     ? redfishDataObject.System.Oem.Dell.DellSystem.SystemGeneration
+          //     : "";
 
-        //   // If iDRAC generation was scanned and 14G or higher, run location scan
-        //   if (
-        //     systemGeneration != "" &&
-        //     parseInt(systemGeneration.substring(0, 2)) >= 14
-        //   ) {
-        //     return fetch_retry(locationUrl, options, 3);
-        //   } else {
-        //     // Else, return "no location data" JSON
-        //     return { data: "no location data fetched" };
-        //   }
-        // })
-        // .then(response => {
-        //   if (response.ok) {
-        //     return response.json();
-        //   } else {
-        //     return { error: "No location data available" };
-        //   }
-        // })
-        // .then(locationData => {
-        //   // Store data from location URL in iDRAC data object
-        //   redfishDataObject["Location"] = locationData;
+          //   // If iDRAC generation was scanned and 14G or higher, run location scan
+          //   if (
+          //     systemGeneration != "" &&
+          //     parseInt(systemGeneration.substring(0, 2)) >= 14
+          //   ) {
+          //     return fetch_retry(locationUrl, options, 3);
+          //   } else {
+          //     // Else, return "no location data" JSON
+          //     return { data: "no location data fetched" };
+          //   }
+          // })
+          // .then(response => {
+          //   if (response.ok) {
+          //     return response.json();
+          //   } else {
+          //     return { error: "No location data available" };
+          //   }
+          // })
+          // .then(locationData => {
+          //   // Store data from location URL in iDRAC data object
+          //   redfishDataObject["Location"] = locationData;
 
-        return fetch_retry(codeNameUrl, options, 3);
-      })
-      .then((response) => {
-        if (response.ok) {
-          return response.json();
-        } else {
-          return { error: "No location data available" };
-        }
-      })
-      .then((codeNameData) => {
-        // Store data from codename URL in iDRAC data object
-        redfishDataObject["codeName"] = codeNameData;
+          return fetch_retry(codeNameUrl, options, 3);
+        })
+        .then((response) => {
+          if (response.ok) {
+            return response.json();
+          } else {
+            return { error: "No location data available" };
+          }
+        })
+        .then((codeNameData) => {
+          // Store data from codename URL in iDRAC data object
+          redfishDataObject["codeName"] = codeNameData;
 
-        // If no generation was scanned, set generation variable to ""
-        let systemGeneration = redfishDataObject.System.hasOwnProperty("Oem")
-          ? redfishDataObject.System.Oem.Dell.DellSystem.SystemGeneration
-          : "";
+          // If no generation was scanned, set generation variable to ""
+          let systemGeneration = redfishDataObject.System.hasOwnProperty("Oem")
+            ? redfishDataObject.System.Oem.Dell.DellSystem.SystemGeneration
+            : "";
 
-        // // If no location was scanned, set location variable to "--"
-        // let serverLocation = redfishDataObject.Location.hasOwnProperty(
-        //   "Attributes"
-        // )
-        //   ? `${redfishDataObject.Location.Attributes["ServerTopology.1.DataCenterName"]}-${redfishDataObject.Location.Attributes["ServerTopology.1.RackName"]}-${redfishDataObject.Location.Attributes["ServerTopology.1.RackSlot"]}`
-        //   : "--";
+          // // If no location was scanned, set location variable to "--"
+          // let serverLocation = redfishDataObject.Location.hasOwnProperty(
+          //   "Attributes"
+          // )
+          //   ? `${redfishDataObject.Location.Attributes["ServerTopology.1.DataCenterName"]}-${redfishDataObject.Location.Attributes["ServerTopology.1.RackName"]}-${redfishDataObject.Location.Attributes["ServerTopology.1.RackSlot"]}`
+          //   : "--";
 
-        // Add or update collection entry with iDRAC data object
-        return db
-          .collection(dbColl_Servers)
-          .findOne(
-            { serviceTag: redfishDataObject.System.SKU },
-            (err, results) => {
-              if (err) {
-                return console.log(err);
-              }
-              // If an entry with the same service tag is found, update the entry
-              if (results !== null) {
-                // // If no location data was scanned, don't update the location field
-                // if (serverLocation == "--") {
-                //   db.collection(dbColl_Servers).updateOne(
-                //     { serviceTag: redfishDataObject.System.SKU },
-                //     {
-                //       $set: {
-                //         ip: item,
-                //         serviceTag: redfishDataObject.System.SKU,
-                //         model: redfishDataObject.System.Model,
-                //         hostname: redfishDataObject.System.HostName,
-                //         generation: systemGeneration
-                //       }
-                //     },
-                //     err => {
-                //       if (err) {
-                //         return console.log(err);
-                //       }
-                //       serverCount++;
-                //       console.log(
-                //         `Server # ${serverCount} @ ${item} updated in db`
-                //       );
-                //     }
-                //   );
-                //   // If location data was scanned, include location field in update query
-                // } else {
-                db.collection(dbColl_Servers).updateOne(
-                  { serviceTag: redfishDataObject.System.SKU },
-                  {
-                    $set: {
-                      ip: item,
-                      serviceTag: redfishDataObject.System.SKU,
-                      firmwareVersion: redfishDataObject.fw.FirmwareVersion,
-                      model: redfishDataObject.System.Model,
-                      hostname: redfishDataObject.System.HostName,
-                      generation: systemGeneration,
-                      // location: serverLocation
-                    },
-                  },
-                  (err) => {
-                    if (err) {
-                      return console.log(err);
-                    }
-                    serverCount++;
-                    console.log(
-                      `Server # ${serverCount} @ ${item} updated in db`
-                    );
-                  }
-                );
-                // }
-                // If no entry with the same service tag is found, add a new entry
-              } else {
-                if (!err) {
-                  db.collection(dbColl_Servers).insertOne(
+          // Add or update collection entry with iDRAC data object
+          return db
+            .collection(dbColl_Servers)
+            .findOne(
+              { serviceTag: redfishDataObject.System.SKU },
+              (err, results) => {
+                if (err) {
+                  return console.log(err);
+                }
+                // If an entry with the same service tag is found, update the entry
+                if (results !== null) {
+                  // // If no location data was scanned, don't update the location field
+                  // if (serverLocation == "--") {
+                  //   db.collection(dbColl_Servers).updateOne(
+                  //     { serviceTag: redfishDataObject.System.SKU },
+                  //     {
+                  //       $set: {
+                  //         ip: item,
+                  //         serviceTag: redfishDataObject.System.SKU,
+                  //         model: redfishDataObject.System.Model,
+                  //         hostname: redfishDataObject.System.HostName,
+                  //         generation: systemGeneration
+                  //       }
+                  //     },
+                  //     err => {
+                  //       if (err) {
+                  //         return console.log(err);
+                  //       }
+                  //       serverCount++;
+                  //       console.log(
+                  //         `Server # ${serverCount} @ ${item} updated in db`
+                  //       );
+                  //     }
+                  //   );
+                  //   // If location data was scanned, include location field in update query
+                  // } else {
+                  db.collection(dbColl_Servers).updateOne(
+                    { serviceTag: redfishDataObject.System.SKU },
                     {
-                      ip: item,
-                      serviceTag: redfishDataObject.System.SKU,
-                      firmwareVersion: redfishDataObject.fw.FirmwareVersion,
-                      model: redfishDataObject.System.Model,
-                      hostname: redfishDataObject.System.HostName,
-                      generation: systemGeneration,
-                      // location: serverLocation,
-                      status: "available",
-                      timestamp: "",
-                      comments: "",
+                      $set: {
+                        ip: item,
+                        serviceTag: redfishDataObject.System.SKU,
+                        firmwareVersion: redfishDataObject.fw.FirmwareVersion,
+                        model: redfishDataObject.System.Model,
+                        hostname: redfishDataObject.System.HostName,
+                        generation: systemGeneration,
+                        // location: serverLocation
+                      },
                     },
-                    { checkKeys: false },
-                    (err, res) => {
+                    (err) => {
                       if (err) {
                         return console.log(err);
                       }
                       serverCount++;
-                      console.log("Server added to db");
-                      console.log("Server #", serverCount);
+                      console.log(
+                        `Server # ${serverCount} @ ${item} updated in db`
+                      );
                     }
                   );
+                  // }
+                  // If no entry with the same service tag is found, add a new entry
+                } else {
+                  if (!err) {
+                    db.collection(dbColl_Servers).insertOne(
+                      {
+                        ip: item,
+                        serviceTag: redfishDataObject.System.SKU,
+                        firmwareVersion: redfishDataObject.fw.FirmwareVersion,
+                        model: redfishDataObject.System.Model,
+                        hostname: redfishDataObject.System.HostName,
+                        generation: systemGeneration,
+                        // location: serverLocation,
+                        status: "available",
+                        timestamp: "",
+                        comments: "",
+                      },
+                      { checkKeys: false },
+                      (err, res) => {
+                        if (err) {
+                          return console.log(err);
+                        }
+                        serverCount++;
+                        console.log("Server added to db");
+                        console.log("Server #", serverCount);
+                      }
+                    );
+                  }
                 }
               }
-            }
-          );
-      })
-      .catch((error) => {
-        console.warn(error);
-      });
-  });
+            );
+        })
+        .catch((error) => {
+          console.warn(error);
+        });
+    });
+  } catch (error) {
+    console.warn("ERROR in getRedfishData: ", error);
+  }
 }
 
 /**
@@ -716,29 +730,67 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 })
     // API endpoint to run bash script that finds live iDRACs on a subnet
     app.post("/findServers", (req, res) => {
       console.log("API to scan IPs is called..");
-      scanSubnet()
-        .then((response) => {
-          if (response.message === "success") {
-            console.log("Scan completed successfully.");
+      // scanSubnet()
+      //   .then((response) => {
+      //     if (response.message === "success") {
+      //       console.log("Scan completed successfully.");
+      //       res.json({
+      //         status: true,
+      //         message: "Scan is complete, file with IPs created.",
+      //       });
+      //       return;
+      //     }
+      //     throw new Error();
+      //   })
+      //   .catch((error) => {
+      //     console.log("Scan failed with error: ", error.message);
+      //     res.json({ status: false, message: error.message });
+      //   });
+
+      let set_of_ips = fs;
+      ip_scan.findIdracsInIpRange(lab_ip_range)
+        .then(response => {
+          if (response.success) {
+            set_of_ips.writeFile(file_idracs, response.results.idracs.join('\n'), err => {
+              if (err) {
+                console.error(`Error writing to file: ${err}`);
+                return;
+              }
+              //file written successfully
+              console.log(`Logged: ${response.results.idracs.length} found live iDRACs to "${file_idracs}"`);
+            });
+            set_of_ips.writeFile(file_others, response.results.others.join('\n'), err => {
+              if (err) {
+                console.error(`Error writing to file: ${err}`);
+                return;
+              }
+              //file written successfully
+              console.log(`Logged: ${response.results.others.length} other network devices found to "${file_others}"`);
+            });
             res.json({
               status: true,
-              message: "Scan is complete, file with IPs created.",
+              message: `Scan is complete: ${response.results.idracs.length} servers were found and logged to "${file_idracs}".`,
             });
-            return;
+          } else {
+            console.log(`findIdracsInIpRange else response: ${response.results}`);
+            // throw new Error();
           }
-          throw new Error();
         })
-        .catch((error) => {
-          console.log("Scan failed with error: ", error.message);
+        .catch(error => {
+          console.log(`Caught error in findIdracsInIpRange: ${error.results}`);
           res.json({ status: false, message: error.message });
-        });
+        })
     });
 
     // Make call to iDRAC Redfish API and save the response data in MongoDB collection
     app.post("/postServers", (req, res) => {
       res.connection.setTimeout(0);
 
+<<<<<<< HEAD
+      let idracIps = readIpFile(file_idracs);
+=======
       let idracIps = readLDfile(ipFile);
+>>>>>>> Dev
       console.log(idracIps);
       return getRedfishData(idracIps, _db);
     });
