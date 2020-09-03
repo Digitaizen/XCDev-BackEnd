@@ -15,9 +15,10 @@ const { count } = require("console");
 const { performance } = require('perf_hooks');
 
 // Declare global variables -----------------------------------------------------------------------
-let set_of_ips = fs;
-let file_idracs = "IPrangeScan-iDRACs.txt";
-let file_others = "IPrangeScan-Others.txt";
+// These vars are for testing
+// let set_of_ips = fs;
+// let file_idracs = "IPrangeScan-iDRACs.txt";
+// let file_others = "IPrangeScan-Others.txt";
 
 // Define module's functions ----------------------------------------------------------------------
 function checkForIdracURL(node_ip) {
@@ -98,58 +99,61 @@ function findIdracsInIpRange(ip_range) {
 
     // Run all queries and wait till all of them finish
     console.log("---Launching all queries...---")
+    let t0 = performance.now(); // Get the timer's 1st value for the function run
     Promise.all(allQueries)
       .then(() => {
+        let t1 = performance.now(); // Get the timer's 2nd value at function's end
         console.log("---All done!---");
+        console.log("Call to findIdracsInIpRange took " + ((t1 - t0) / 1000) + " seconds."); // Calculate and output the function's run time
         resolve({ success: true, results: { idracs: live_idracs, others: other_devices } });
       })
       .catch(error => {
         console.log("Catch in Promise.all: " + error);
-        reject({ success: false, results: error });
+        // reject({ success: false, results: `CATCH in Promise.all: ${error}` });
       })
       // Debugging
       .then(() => {
-        console.log(`iDRACs found: ${live_idracs.length}, their IPs: ${live_idracs}`);
-        console.log(`Other network devices: ${other_devices.length}, their IPs: ${other_devices}`);
+        console.log(`\niDRACs found: ${live_idracs.length}, their IPs: ${live_idracs}`);
+        console.log(`\nOther network devices found: ${other_devices.length}, their IPs: ${other_devices}`);
       })
   });
 }
 
 // Testing.. --------------------------------------------------------------------------------------
-let t0 = performance.now(); // Get the first timer value for the function run
-findIdracsInIpRange('100.80.144.0-100.80.148.255')
-  .then(response => {
-    if (response.success) {
-      set_of_ips.writeFile(file_idracs, response.results.idracs.join('\n'), err => {
-        if (err) {
-          console.error(`Error writing to file: ${err}`);
-          return;
-        }
-        //file written successfully
-        console.log(`Logged: ${response.results.idracs.length} found live iDRACs to "${file_idracs}"`);
-      });
-      set_of_ips.writeFile(file_others, response.results.others.join('\n'), err => {
-        if (err) {
-          console.error(`Error writing to file: ${err}`);
-          return;
-        }
-        //file written successfully
-        console.log(`Logged: ${response.results.others.length} other network devices found to "${file_others}"`);
-      });
-    } else {
-      console.log(`findIdracsInIpRange else response: ${response.results}`);
-    }
-  })
-  .catch(error => {
-    console.log(`Caught error in findIdracsInIpRange: ${error.results}`);
-  })
-  .then(() => {
-    let t1 = performance.now(); // Get the second timer value at function's end
-    console.log("Call to findIdracsInIpRange took " + ((t1 - t0) / 1000) + " seconds."); // Calculate and output the function's run time
-  })
-  .catch(error => {
-    console.log("Error in measuring performance: " + error)
-  });
+// let t0 = performance.now(); // Get the first timer value for the function run
+// findIdracsInIpRange('100.80.144.0-100.80.148.255')
+//   .then(response => {
+//     if (response.success) {
+//       set_of_ips.writeFile(file_idracs, response.results.idracs.join('\n'), err => {
+//         if (err) {
+//           console.error(`Error writing to file: ${err}`);
+//           return;
+//         }
+//         //file written successfully
+//         console.log(`Logged: ${response.results.idracs.length} found live iDRACs to "${file_idracs}"`);
+//       });
+//       set_of_ips.writeFile(file_others, response.results.others.join('\n'), err => {
+//         if (err) {
+//           console.error(`Error writing to file: ${err}`);
+//           return;
+//         }
+//         //file written successfully
+//         console.log(`Logged: ${response.results.others.length} other network devices found to "${file_others}"`);
+//       });
+//     } else {
+//       console.log(`findIdracsInIpRange else response: ${response.results}`);
+//     }
+//   })
+//   .catch(error => {
+//     console.log(`Caught error in findIdracsInIpRange: ${error.results}`);
+//   })
+//   .then(() => {
+//     let t1 = performance.now(); // Get the second timer value at function's end
+//     console.log("Call to findIdracsInIpRange took " + ((t1 - t0) / 1000) + " seconds."); // Calculate and output the function's run time
+//   })
+//   .catch(error => {
+//     console.log("Error in measuring performance: " + error)
+//   });
 
 // Expose module's function(s) to the outside
 module.exports = { findIdracsInIpRange };
