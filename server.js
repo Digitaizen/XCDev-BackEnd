@@ -44,7 +44,7 @@ const portNum = 8080;
 const lab_ip_range = "100.80.144.0-100.80.148.255";
 const file_idracs = "IPrangeScan-iDRACs.txt";
 const file_others = "IPrangeScan-Others.txt";
-const ipFile = "./active_iDRAC_ips.txt";
+// const ipFile = "./active_iDRAC_ips.txt";
 const bmrValues = "./bmr_payload_values.txt";
 const iDracLogin = "root";
 const iDracPassword = "calvin";
@@ -796,7 +796,7 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 })
     app.post("/postServers", (req, res) => {
       res.connection.setTimeout(0);
 
-      let idracIps = readLDfile(ipFile);
+      let idracIps = readLDfile(file_idracs);
       console.log(idracIps);
       return getRedfishData(idracIps, _db);
     });
@@ -1151,7 +1151,7 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 })
       let queryFail = [];
 
       //Load the iDRAC IP list from a text file
-      let idracIps = readLDfile(ipFile);
+      let idracIps = readLDfile(file_idracs);
 
       //Loop through each iDRAC and get its inventory, then save it to db
       idracIps.forEach((node_ip) => {
