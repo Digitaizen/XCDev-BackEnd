@@ -897,6 +897,7 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 })
             // If firmware version is older than 3.21.26.22, exclude server from results
             let resultArray = servers.filter(
               (server) =>
+                server.firmwareVersion !== undefined &&
                 parseInt(server.firmwareVersion.split(".").join("")) >= 3212622
             );
             // Return array of servers belonging to specified user
