@@ -435,14 +435,14 @@ function getComponentDataArray(dbObject) {
 //   }
 // }
 
-/**
- * Retrieves all data from MongoDB collection & returns it as an array
- * @return {array} array of JSON objects, each representing a single iDRAC's data
- */
-function getMongoData(db) {
-  let result = db.collection(dbColl_Servers).find().toArray();
-  return result;
-}
+// /**
+//  * Retrieves all data from MongoDB collection & returns it as an array
+//  * @return {array} array of JSON objects, each representing a single iDRAC's data
+//  */
+// function getMongoData(db) {
+//   let result = db.collection(dbColl_Servers).find().toArray();
+//   return result;
+// }
 
 /**
  * Determines if username and password fields contain valid/non-empty input
@@ -738,77 +738,77 @@ mongoUtil
         }
       });
 
-      // API endpoint to run bash script that finds live iDRACs on a subnet
-      app.post("/findServers", (req, res) => {
-        console.log("API to scan IPs is called..");
-        // scanSubnet()
-        //   .then((response) => {
-        //     if (response.message === "success") {
-        //       console.log("Scan completed successfully.");
-        //       res.json({
-        //         status: true,
-        //         message: "Scan is complete, file with IPs created.",
-        //       });
-        //       return;
-        //     }
-        //     throw new Error();
-        //   })
-        //   .catch((error) => {
-        //     console.log("Scan failed with error: ", error.message);
-        //     res.json({ status: false, message: error.message });
-        //   });
+      // // API endpoint to run bash script that finds live iDRACs on a subnet
+      // app.post("/findServers", (req, res) => {
+      //   console.log("API to scan IPs is called..");
+      //   // scanSubnet()
+      //   //   .then((response) => {
+      //   //     if (response.message === "success") {
+      //   //       console.log("Scan completed successfully.");
+      //   //       res.json({
+      //   //         status: true,
+      //   //         message: "Scan is complete, file with IPs created.",
+      //   //       });
+      //   //       return;
+      //   //     }
+      //   //     throw new Error();
+      //   //   })
+      //   //   .catch((error) => {
+      //   //     console.log("Scan failed with error: ", error.message);
+      //   //     res.json({ status: false, message: error.message });
+      //   //   });
 
-        let set_of_ips = fs;
-        ip_scan
-          .findIdracsInIpRange(lab_ip_range)
-          .then((response) => {
-            if (response.success) {
-              set_of_ips.writeFile(
-                file_idracs,
-                response.results.idracs.join("\n"),
-                (err) => {
-                  if (err) {
-                    console.error(`Error writing to file: ${err}`);
-                    return;
-                  }
-                  //file written successfully
-                  console.log(
-                    `Logged: ${response.results.idracs.length} found live iDRACs to "${file_idracs}"`
-                  );
-                }
-              );
-              set_of_ips.writeFile(
-                file_others,
-                response.results.others.join("\n"),
-                (err) => {
-                  if (err) {
-                    console.error(`Error writing to file: ${err}`);
-                    return;
-                  }
-                  //file written successfully
-                  console.log(
-                    `Logged: ${response.results.others.length} other network devices found to "${file_others}"`
-                  );
-                }
-              );
-              res.json({
-                status: true,
-                message: `Scan is complete: ${response.results.idracs.length} servers were found and logged to "${file_idracs}".`,
-              });
-            } else {
-              console.log(
-                `findIdracsInIpRange else response: ${response.results}`
-              );
-              // throw new Error();
-            }
-          })
-          .catch((error) => {
-            console.log(
-              `Caught error in findIdracsInIpRange: ${error.results}`
-            );
-            res.json({ status: false, message: error.message });
-          });
-      });
+      //   let set_of_ips = fs;
+      //   ip_scan
+      //     .findIdracsInIpRange(lab_ip_range)
+      //     .then((response) => {
+      //       if (response.success) {
+      //         set_of_ips.writeFile(
+      //           file_idracs,
+      //           response.results.idracs.join("\n"),
+      //           (err) => {
+      //             if (err) {
+      //               console.error(`Error writing to file: ${err}`);
+      //               return;
+      //             }
+      //             //file written successfully
+      //             console.log(
+      //               `Logged: ${response.results.idracs.length} found live iDRACs to "${file_idracs}"`
+      //             );
+      //           }
+      //         );
+      //         set_of_ips.writeFile(
+      //           file_others,
+      //           response.results.others.join("\n"),
+      //           (err) => {
+      //             if (err) {
+      //               console.error(`Error writing to file: ${err}`);
+      //               return;
+      //             }
+      //             //file written successfully
+      //             console.log(
+      //               `Logged: ${response.results.others.length} other network devices found to "${file_others}"`
+      //             );
+      //           }
+      //         );
+      //         res.json({
+      //           status: true,
+      //           message: `Scan is complete: ${response.results.idracs.length} servers were found and logged to "${file_idracs}".`,
+      //         });
+      //       } else {
+      //         console.log(
+      //           `findIdracsInIpRange else response: ${response.results}`
+      //         );
+      //         // throw new Error();
+      //       }
+      //     })
+      //     .catch((error) => {
+      //       console.log(
+      //         `Caught error in findIdracsInIpRange: ${error.results}`
+      //       );
+      //       res.json({ status: false, message: error.message });
+      //     });
+      // });
 
       // // Make call to iDRAC Redfish API and save the response data in MongoDB collection
       // app.post("/postServers", (req, res) => {
@@ -819,89 +819,89 @@ mongoUtil
       //   return getRedfishData(idracIps, _db);
       // });
 
-      // Get collection data from MongoDB and return relevant data
-      app.get("/getServers", (req, res) => {
-        getMongoData(_db).then((results) => {
-          res.send(results);
-        });
-      });
+      // // Get collection data from MongoDB and return relevant data
+      // app.get("/getServers", (req, res) => {
+      //   getMongoData(_db).then((results) => {
+      //     res.send(results);
+      //   });
+      // });
 
-      // Get status value of server that has specified id
-      app.get("/status/:id", (req, res) => {
-        _db
-          .collection(dbColl_Servers)
-          .findOne(
-            { _id: mongoose.Types.ObjectId(req.params.id) },
-            (err, results) => {
-              if (err) {
-                res.status(500).json(Object.assign({ success: false }, err));
-              } else {
-                res.json(
-                  Object.assign(
-                    {
-                      success: true,
-                      message:
-                        "Document with specified _id successfully retrieved",
-                    },
-                    results
-                  )
-                );
-              }
-            }
-          );
-      });
+      // // Get status value of server that has specified id
+      // app.get("/status/:id", (req, res) => {
+      //   _db
+      //     .collection(dbColl_Servers)
+      //     .findOne(
+      //       { _id: mongoose.Types.ObjectId(req.params.id) },
+      //       (err, results) => {
+      //         if (err) {
+      //           res.status(500).json(Object.assign({ success: false }, err));
+      //         } else {
+      //           res.json(
+      //             Object.assign(
+      //               {
+      //                 success: true,
+      //                 message:
+      //                   "Document with specified _id successfully retrieved",
+      //               },
+      //               results
+      //             )
+      //           );
+      //         }
+      //       }
+      //     );
+      // });
 
-      app.patch("/patchStatus/:id", (req, res) => {
-        _db.collection(dbColl_Servers).updateOne(
-          { _id: mongoose.Types.ObjectId(req.params.id) },
-          {
-            $set: {
-              status: req.body.status,
-              timestamp: req.body.timestamp,
-            },
-          },
-          (err, results) => {
-            if (err) {
-              res.status(500).json(Object.assign({ success: false }, err));
-            } else {
-              res
-                .status(200)
-                .json(
-                  Object.assign(
-                    { success: true, message: "Status successfully patched" },
-                    results
-                  )
-                );
-            }
-          }
-        );
-      });
+      // app.patch("/patchStatus/:id", (req, res) => {
+      //   _db.collection(dbColl_Servers).updateOne(
+      //     { _id: mongoose.Types.ObjectId(req.params.id) },
+      //     {
+      //       $set: {
+      //         status: req.body.status,
+      //         timestamp: req.body.timestamp,
+      //       },
+      //     },
+      //     (err, results) => {
+      //       if (err) {
+      //         res.status(500).json(Object.assign({ success: false }, err));
+      //       } else {
+      //         res
+      //           .status(200)
+      //           .json(
+      //             Object.assign(
+      //               { success: true, message: "Status successfully patched" },
+      //               results
+      //             )
+      //           );
+      //       }
+      //     }
+      //   );
+      // });
 
-      // Patch comments value of server that has specified id
-      app.patch("/patchComments/:id", (req, res) => {
-        _db.collection(dbColl_Servers).updateOne(
-          { _id: mongoose.Types.ObjectId(req.params.id) },
-          {
-            $set: {
-              comments: req.body.comments,
-            },
-          },
-          (err, results) => {
-            if (err) {
-              res.status(500).json(Object.assign({ success: false }, err));
-            } else {
-              res
-                .status(200)
-                .json(
-                  Object.assign(
-                    { success: true, message: "Comment successfully patched" },
-                    results
-                  )
-                );
-            }
-          }
-        );
-      });
+      // // Patch comments value of server that has specified id
+      // app.patch("/patchComments/:id", (req, res) => {
+      //   _db.collection(dbColl_Servers).updateOne(
+      //     { _id: mongoose.Types.ObjectId(req.params.id) },
+      //     {
+      //       $set: {
+      //         comments: req.body.comments,
+      //       },
+      //     },
+      //     (err, results) => {
+      //       if (err) {
+      //         res.status(500).json(Object.assign({ success: false }, err));
+      //       } else {
+      //         res
+      //           .status(200)
+      //           .json(
+      //             Object.assign(
+      //               { success: true, message: "Comment successfully patched" },
+      //               results
+      //             )
+      //           );
+      //       }
+      //     }
+      //   );
+      // });
 
       // Fetch servers checked out by a specified user
       app.get("/getUserServers/:name", (req, res) => {
