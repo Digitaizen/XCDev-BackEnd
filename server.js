@@ -34,7 +34,8 @@ let path = require("path");
 const bmrIsoProcess = require("./boot_to_BMR");
 const ip_scan = require("./iDRAC_IP_Scan");
 
-const router = require("./api/serverRoutes");
+const serverRouter = require("./api/serverRoutes");
+const loginRouter = require("./api/loginRoutes");
 const mongoUtil = require("./mongoUtil");
 
 // Declare the globals ////////////////////////////////////////////////////////
@@ -444,79 +445,79 @@ function getComponentDataArray(dbObject) {
 //   return result;
 // }
 
-/**
- * Determines if username and password fields contain valid/non-empty input
- *
- * @param {JSON} data JSON object containing login info submitted by user
- */
-function validateLoginInput(data) {
-  let errors = {};
+// /**
+//  * Determines if username and password fields contain valid/non-empty input
+//  *
+//  * @param {JSON} data JSON object containing login info submitted by user
+//  */
+// function validateLoginInput(data) {
+//   let errors = {};
 
-  // Convert empty fields to an empty string so we can use validator functions
-  data.username = !isEmpty(data.username) ? data.username : "";
-  data.password = !isEmpty(data.password) ? data.password : "";
+//   // Convert empty fields to an empty string so we can use validator functions
+//   data.username = !isEmpty(data.username) ? data.username : "";
+//   data.password = !isEmpty(data.password) ? data.password : "";
 
-  // Username checks
-  if (Validator.isEmpty(data.username)) {
-    errors.message = "Username field is required";
-  }
+//   // Username checks
+//   if (Validator.isEmpty(data.username)) {
+//     errors.message = "Username field is required";
+//   }
 
-  // Password checks
-  if (Validator.isEmpty(data.password)) {
-    errors.message = "Password field is required";
-  }
+//   // Password checks
+//   if (Validator.isEmpty(data.password)) {
+//     errors.message = "Password field is required";
+//   }
 
-  return {
-    errors,
-    isValid: isEmpty(errors),
-  };
-}
+//   return {
+//     errors,
+//     isValid: isEmpty(errors),
+//   };
+// }
 
-/**
- * Determines if registration fields contain valid/non-empty input
- *
- * @param {JSON} data JSON object containing registration info submitted by user
- */
-function validateRegisterInput(data) {
-  let errors = {};
+// /**
+//  * Determines if registration fields contain valid/non-empty input
+//  *
+//  * @param {JSON} data JSON object containing registration info submitted by user
+//  */
+// function validateRegisterInput(data) {
+//   let errors = {};
 
-  // Convert empty fields to an empty string so we can use validator functions
-  data.name = !isEmpty(data.name) ? data.name : "";
-  data.email = !isEmpty(data.email) ? data.email : "";
-  data.username = !isEmpty(data.username) ? data.username : "";
-  data.password = !isEmpty(data.password) ? data.password : "";
+//   // Convert empty fields to an empty string so we can use validator functions
+//   data.name = !isEmpty(data.name) ? data.name : "";
+//   data.email = !isEmpty(data.email) ? data.email : "";
+//   data.username = !isEmpty(data.username) ? data.username : "";
+//   data.password = !isEmpty(data.password) ? data.password : "";
 
-  // Name checks
-  if (Validator.isEmpty(data.name)) {
-    errors.message = "Name field is required";
-  }
+//   // Name checks
+//   if (Validator.isEmpty(data.name)) {
+//     errors.message = "Name field is required";
+//   }
 
-  // Email checks
-  if (Validator.isEmpty(data.email)) {
-    errors.message = "Email field is required";
-  } else if (!Validator.isEmail(data.email)) {
-    errors.message = "Email is invalid";
-  }
+//   // Email checks
+//   if (Validator.isEmpty(data.email)) {
+//     errors.message = "Email field is required";
+//   } else if (!Validator.isEmail(data.email)) {
+//     errors.message = "Email is invalid";
+//   }
 
-  // Username checks
-  if (Validator.isEmpty(data.username)) {
-    errors.message = "Username field is required";
-  }
+//   // Username checks
+//   if (Validator.isEmpty(data.username)) {
+//     errors.message = "Username field is required";
+//   }
 
-  // Password checks
-  if (Validator.isEmpty(data.password)) {
-    errors.message = "Password field is required";
-  }
+//   // Password checks
+//   if (Validator.isEmpty(data.password)) {
+//     errors.message = "Password field is required";
+//   }
 
-  if (!Validator.isLength(data.password, { min: 6, max: 30 })) {
-    errors.message = "Password must be at least 6 characters";
-  }
+//   if (!Validator.isLength(data.password, { min: 6, max: 30 })) {
+//     errors.message = "Password must be at least 6 characters";
+//   }
 
-  return {
-    errors,
-    isValid: isEmpty(errors),
-  };
-}
+//   return {
+//     errors,
+//     isValid: isEmpty(errors),
+//   };
+// }
 
 async function getFactoryBlock() {
   return new Promise(function (resolve, reject) {
@@ -609,134 +610,135 @@ mongoUtil
       });
       morganBody(app, { stream: accessLogStream, noColors: true });
 
-      app.use(router);
+      app.use(serverRouter);
+      app.use(loginRouter);
 
-      // Accept valid login credentials and return a JSON web token
-      app.post("/login", (req, res) => {
-        // Form validation
-        const { errors, isValid } = validateLoginInput(req.body);
+      // // Accept valid login credentials and return a JSON web token
+      // app.post("/login", (req, res) => {
+      //   // Form validation
+      //   const { errors, isValid } = validateLoginInput(req.body);
 
-        // Check validation
-        if (!isValid) {
-          return res
-            .status(400)
-            .json(Object.assign({ success: false }, errors));
-        }
+      //   // Check validation
+      //   if (!isValid) {
+      //     return res
+      //       .status(400)
+      //       .json(Object.assign({ success: false }, errors));
+      //   }
 
-        // If user exists and password is correct, return a success token
-        _db
-          .collection(dbColl_Users)
-          .findOne({
-            username: {
-              $regex: new RegExp(
-                "^" + req.body.username.toLowerCase() + "$",
-                "i"
-              ),
-            },
-          })
-          .then((user) => {
-            // Check if user exists
-            if (!user) {
-              return res.status(404).json({
-                success: false,
-                message: "Username not found",
-              });
-            }
+      //   // If user exists and password is correct, return a success token
+      //   _db
+      //     .collection(dbColl_Users)
+      //     .findOne({
+      //       username: {
+      //         $regex: new RegExp(
+      //           "^" + req.body.username.toLowerCase() + "$",
+      //           "i"
+      //         ),
+      //       },
+      //     })
+      //     .then((user) => {
+      //       // Check if user exists
+      //       if (!user) {
+      //         return res.status(404).json({
+      //           success: false,
+      //           message: "Username not found",
+      //         });
+      //       }
 
-            // Check password
+      //       // Check password
 
-            if (req.body.password == user.password) {
-              // User matched
-              // Create JWT Payload
-              const payload = {
-                id: user.id,
-                name: user.name,
-              };
+      //       if (req.body.password == user.password) {
+      //         // User matched
+      //         // Create JWT Payload
+      //         const payload = {
+      //           id: user.id,
+      //           name: user.name,
+      //         };
 
-              // Sign token
-              jwt.sign(
-                payload,
-                keys.secretOrKey,
-                {
-                  expiresIn: 31556926, // 1 year in seconds
-                },
-                (err, token) => {
-                  res.json({
-                    success: true,
-                    message: "Login is successful",
-                    token: "Bearer " + token,
-                    userInfo: user,
-                  });
-                }
-              );
-            } else {
-              return res
-                .status(400)
-                .json({ success: false, message: "Password incorrect" });
-            }
-          });
-      });
+      //         // Sign token
+      //         jwt.sign(
+      //           payload,
+      //           keys.secretOrKey,
+      //           {
+      //             expiresIn: 31556926, // 1 year in seconds
+      //           },
+      //           (err, token) => {
+      //             res.json({
+      //               success: true,
+      //               message: "Login is successful",
+      //               token: "Bearer " + token,
+      //               userInfo: user,
+      //             });
+      //           }
+      //         );
+      //       } else {
+      //         return res
+      //           .status(400)
+      //           .json({ success: false, message: "Password incorrect" });
+      //       }
+      //     });
+      // });
 
-      // Add new user credentials to users collection and return credentials as JSON
-      app.post("/register", async (req, res) => {
-        // Form validation
-        const { errors, isValid } = validateRegisterInput(req.body);
+      // // Add new user credentials to users collection and return credentials as JSON
+      // app.post("/register", async (req, res) => {
+      //   // Form validation
+      //   const { errors, isValid } = validateRegisterInput(req.body);
 
-        // Check validation
-        if (!isValid) {
-          return res
-            .status(400)
-            .json(Object.assign({ success: false }, errors));
-        }
+      //   // Check validation
+      //   if (!isValid) {
+      //     return res
+      //       .status(400)
+      //       .json(Object.assign({ success: false }, errors));
+      //   }
 
-        try {
-          // Check if email is already in use; if not, create new user record in collection
-          _db
-            .collection(dbColl_Users)
-            .findOne({
-              email: {
-                $regex: new RegExp(
-                  "^" + req.body.email.toLowerCase() + "$",
-                  "i"
-                ),
-              },
-            })
-            .then((user) => {
-              if (user) {
-                return res
-                  .status(400)
-                  .json({ success: false, message: "Email already exists" });
-              } else {
-                _db
-                  .collection(dbColl_Users)
-                  .insertOne(
-                    {
-                      name: req.body.name,
-                      email: req.body.email,
-                      username: req.body.username,
-                      password: req.body.password,
-                    },
-                    { checkKeys: false }
-                  )
-                  .then((user) =>
-                    res.json(
-                      Object.assign(
-                        {
-                          success: true,
-                          message: "Registration is successful",
-                        },
-                        user.ops[0]
-                      )
-                    )
-                  )
-                  .catch((err) => console.log(err));
-                console.log("You're registered! Now login");
-              }
-            });
-        } catch {
-          console.log("There was an error while registering");
-        }
-      });
+      //   try {
+      //     // Check if email is already in use; if not, create new user record in collection
+      //     _db
+      //       .collection(dbColl_Users)
+      //       .findOne({
+      //         email: {
+      //           $regex: new RegExp(
+      //             "^" + req.body.email.toLowerCase() + "$",
+      //             "i"
+      //           ),
+      //         },
+      //       })
+      //       .then((user) => {
+      //         if (user) {
+      //           return res
+      //             .status(400)
+      //             .json({ success: false, message: "Email already exists" });
+      //         } else {
+      //           _db
+      //             .collection(dbColl_Users)
+      //             .insertOne(
+      //               {
+      //                 name: req.body.name,
+      //                 email: req.body.email,
+      //                 username: req.body.username,
+      //                 password: req.body.password,
+      //               },
+      //               { checkKeys: false }
+      //             )
+      //             .then((user) =>
+      //               res.json(
+      //                 Object.assign(
+      //                   {
+      //                     success: true,
+      //                     message: "Registration is successful",
+      //                   },
+      //                   user.ops[0]
+      //                 )
+      //               )
+      //             )
+      //             .catch((err) => console.log(err));
+      //           console.log("You're registered! Now login");
+      //         }
+      //       });
+      //   } catch {
+      //     console.log("There was an error while registering");
+      //   }
+      // });
 
       // // API endpoint to run bash script that finds live iDRACs on a subnet
       // app.post("/findServers", (req, res) => {
@@ -1105,60 +1107,60 @@ mongoUtil
         }
       });
 
-      // Reset password of user with specified password-reset token
-      app.post("/reset", async (req, res) => {
-        _db
-          .collection(dbColl_Users)
-          .findOne({ username: req.body.username })
-          .then((user) => {
-            // Check if user exists
-            if (!user) {
-              return res
-                .status(404)
-                .json({ success: false, message: "Username not found" });
-            }
+      // // Reset password of user with specified password-reset token
+      // app.post("/reset", async (req, res) => {
+      //   _db
+      //     .collection(dbColl_Users)
+      //     .findOne({ username: req.body.username })
+      //     .then((user) => {
+      //       // Check if user exists
+      //       if (!user) {
+      //         return res
+      //           .status(404)
+      //           .json({ success: false, message: "Username not found" });
+      //       }
 
-            // Check if password is long enough
-            if (!Validator.isLength(req.body.password, { min: 6, max: 30 })) {
-              return res.status(404).json({
-                success: false,
-                message: "Password must be at least 6 characters",
-              });
-            }
+      //       // Check if password is long enough
+      //       if (!Validator.isLength(req.body.password, { min: 6, max: 30 })) {
+      //         return res.status(404).json({
+      //           success: false,
+      //           message: "Password must be at least 6 characters",
+      //         });
+      //       }
 
-            // Check if passwords match
-            if (!Validator.equals(req.body.password, req.body.password2)) {
-              return res
-                .status(404)
-                .json({ success: false, message: "Passwords must match" });
-            }
+      //       // Check if passwords match
+      //       if (!Validator.equals(req.body.password, req.body.password2)) {
+      //         return res
+      //           .status(404)
+      //           .json({ success: false, message: "Passwords must match" });
+      //       }
 
-            // Update user record with new password
-            _db.collection(dbColl_Users).updateOne(
-              { username: req.body.username },
-              {
-                $set: {
-                  password: req.body.password,
-                },
-              },
-              function (err, results) {
-                if (err) {
-                  res.status(500).json(Object.assign({ success: false }, err));
-                } else {
-                  res.status(200).json(
-                    Object.assign(
-                      {
-                        success: true,
-                        message: "Password successfully reset",
-                      },
-                      results
-                    )
-                  );
-                }
-              }
-            );
-          });
-      });
+      //       // Update user record with new password
+      //       _db.collection(dbColl_Users).updateOne(
+      //         { username: req.body.username },
+      //         {
+      //           $set: {
+      //             password: req.body.password,
+      //           },
+      //         },
+      //         function (err, results) {
+      //           if (err) {
+      //             res.status(500).json(Object.assign({ success: false }, err));
+      //           } else {
+      //             res.status(200).json(
+      //               Object.assign(
+      //                 {
+      //                   success: true,
+      //                   message: "Password successfully reset",
+      //                 },
+      //                 results
+      //               )
+      //             );
+      //           }
+      //         }
+      //       );
+      //     });
+      // });
 
       // **Component Inventory API Endpoint START**
       app.post("/hardwareInventoryToDb", (req, res) => {
