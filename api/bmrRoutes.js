@@ -5,6 +5,7 @@ const mongoUtil = require("../mongoUtil");
 const { readdirSync, statSync } = require("fs");
 const bmrValues = "../bmr_payload_values.txt";
 const bmrIsoProcess = require("../boot_to_BMR");
+const { exec, execFile } = require("child_process");
 
 // Global variables
 const dbColl_Servers = "servers";
