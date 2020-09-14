@@ -58,8 +58,7 @@ router.get("/getFactoryBlock", (req, res) => {
   //   console.error(data);
   // });
 
-  //   let source = "/mnt/bmr";
-  let source = "/Documents";
+  let source = "/mnt/bmr";
 
   const getDirectories = (source) =>
     readdirSync(source, { withFileTypes: true })
