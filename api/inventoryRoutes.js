@@ -7,6 +7,8 @@ const { exec, execFile } = require("child_process");
 
 // Global variables
 const file_idracs = "IPrangeScan-iDRACs.txt";
+const iDracLogin = "root";
+const iDracPassword = "calvin";
 
 // Read text file, remove spaces and empty lines, and return an array of text lines
 function readLDfile(fName) {
