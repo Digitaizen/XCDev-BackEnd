@@ -4,7 +4,7 @@ const router = express.Router();
 const mongoUtil = require("../mongoUtil");
 const fs = require("fs");
 const { readdirSync, statSync } = require("fs");
-const bmrValues = "../bmr_payload_values.txt";
+const bmrValues = "bmr_payload_values.txt";
 const bmrIsoProcess = require("../boot_to_BMR");
 const { exec, execFile } = require("child_process");
 
