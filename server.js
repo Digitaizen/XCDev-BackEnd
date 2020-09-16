@@ -37,7 +37,7 @@ const { response } = require("express");
 
 // Declare the globals ////////////////////////////////////////////////////////
 const dbUrl = "mongodb://localhost:27017";
-const dbName = "master";
+const dbName = "dev";
 const dbColl_Servers = "servers";
 const dbColl_Users = "users";
 const portNum = 8080;
@@ -442,6 +442,13 @@ function getMongoData(db) {
   return result;
 }
 
+// Retrieves server(s)' data for specified Service Tags from the database & returns it
+// as an array of JSON objects
+function getServersDataByTag(db, stArr) {
+  let result = db.collection(dbColl_Servers).find({ serviceTag: { $in: stArr } }).toArray();
+  return result;
+}
+
 /**
  * Determines if username and password fields contain valid/non-empty input
  *
@@ -789,6 +796,25 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 })
         .catch((error) => {
           console.log(`Caught error in findIdracsInIpRange: ${error.results}`);
           res.json({ status: false, message: error.message });
+        });
+    });
+
+    // API endpoint that will return server(s)' data for a given array of
+    // Service Tags
+    app.post("/getServersByTag", (req, res) => {
+      console.log("API to get requested servers is called..");
+      // Get array of Service Tags from the request body
+      let theseServiceTags = req.body.ServiceTagArr;
+
+      // Call function to do the database query for these nodes
+      getServersDataByTag(_db, theseServiceTags)
+        .then((results) => {
+          console.log("Success: data on requested servers sent back.");
+          res.send(results);
+        })
+        .catch((error) => {
+          console.log(`Failure: caught error in getServersDataByTag: ${error.results}`);
+          res.send([]);
         });
     });
 
