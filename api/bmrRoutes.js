@@ -115,7 +115,7 @@ router.get("/getBmrIso", (req, res) => {
 
 // Getting data from Front-END and passing it to the BMR Process Scripts
 router.post("/bmrFactoryImaging", (req, res) => {
-  // console.log(req.body);
+  console.log(req.body);
 
   // Define bmr payload values for mounting network image
   let ip_arr = req.body.selectedRowData.map((server) => {
@@ -174,7 +174,7 @@ router.post("/bmrFactoryImaging", (req, res) => {
             lclogs.push(
               new Promise((resolve, reject) => {
                 const myShellScript = exec(
-                  `sh ../bmr-parm.sh ${ipAddress} ${block_name} ${hypervisor_name} ${share_name} ${bmr_username} ${bmr_password}`
+                  `sh bmr-parm.sh ${ipAddress} ${block_name} ${hypervisor_name} ${share_name} ${bmr_username} ${bmr_password}`
                 );
                 myShellScript.stdout.on("data", (data) => {
                   // console.log(data);
