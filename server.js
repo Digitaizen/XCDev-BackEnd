@@ -54,6 +54,7 @@ const corsOptions = {
     "http://localhost:3000",
     "http://100.80.149.19",
     "http://100.80.150.91",
+    "http://100.80.149.97",
   ],
 };
 
@@ -161,7 +162,7 @@ function writeToInventoryColl(dbObject, jsonObject) {
 function getComponentDataArray(dbObject) {
   return new Promise((resolve, reject) => {
     dbObject
-      .collection("inventory")
+      .collection(dbColl_CompInv)
       .find()
       .toArray(function (err, docs) {
         if (err) {
