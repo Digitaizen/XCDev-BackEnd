@@ -40,6 +40,7 @@ const dbUrl = "mongodb://localhost:27017";
 const dbName = "master";
 const dbColl_Servers = "servers";
 const dbColl_Users = "users";
+const dbColl_CompInv = "componentInventory";
 const portNum = 8080;
 const lab_ip_range = "100.80.144.0-100.80.148.255";
 const file_idracs = "IPrangeScan-iDRACs.txt";
@@ -105,14 +106,14 @@ function getServerInventory(node_ip) {
 function writeToInventoryColl(dbObject, jsonObject) {
   return new Promise((resolve, reject) => {
     dbObject
-      .collection("inventory")
+      .collection(dbColl_CompInv)
       .findOne({ serviceTag: jsonObject.SystemInformation.SKU }, (err, res) => {
         if (err) {
           console.log(err);
         }
         // If an entry with the same service tag is found, update the entry
         if (res !== null) {
-          dbObject.collection("inventory").updateOne(
+          dbObject.collection(dbColl_CompInv).updateOne(
             { serviceTag: jsonObject.SystemInformation.SKU },
             {
               $set: {
@@ -134,7 +135,7 @@ function writeToInventoryColl(dbObject, jsonObject) {
           // If no entry with the same service tag is found, add a new entry
         } else {
           if (!err) {
-            dbObject.collection("inventory").insertOne(
+            dbObject.collection(dbColl_CompInv).insertOne(
               {
                 serviceTag: jsonObject.SystemInformation.SKU,
                 data: jsonObject,
@@ -445,7 +446,10 @@ function getMongoData(db) {
 // Retrieves server(s)' data for specified Service Tags from the database & returns it
 // as an array of JSON objects
 function getServersDataByTag(db, stArr) {
-  let result = db.collection(dbColl_Servers).find({ serviceTag: { $in: stArr } }).toArray();
+  let result = db
+    .collection(dbColl_Servers)
+    .find({ serviceTag: { $in: stArr } })
+    .toArray();
   return result;
 }
 
@@ -813,7 +817,9 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 })
           res.send(results);
         })
         .catch((error) => {
-          console.log(`Failure: caught error in getServersDataByTag: ${error.results}`);
+          console.log(
+            `Failure: caught error in getServersDataByTag: ${error.results}`
+          );
           res.send([]);
         });
     });
