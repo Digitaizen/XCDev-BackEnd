@@ -40,6 +40,7 @@ const dbUrl = "mongodb://localhost:27017";
 const dbName = "master";
 const dbColl_Servers = "servers";
 const dbColl_Users = "users";
+const dbColl_CompInv = "componentInventory";
 const portNum = 8080;
 const lab_ip_range = "100.80.144.0-100.80.148.255";
 const file_idracs = "IPrangeScan-iDRACs.txt";
@@ -53,6 +54,7 @@ const corsOptions = {
     "http://localhost:3000",
     "http://100.80.149.19",
     "http://100.80.150.91",
+    "http://100.80.149.97",
   ],
 };
 
@@ -105,14 +107,14 @@ function getServerInventory(node_ip) {
 function writeToInventoryColl(dbObject, jsonObject) {
   return new Promise((resolve, reject) => {
     dbObject
-      .collection("inventory")
+      .collection(dbColl_CompInv)
       .findOne({ serviceTag: jsonObject.SystemInformation.SKU }, (err, res) => {
         if (err) {
           console.log(err);
         }
         // If an entry with the same service tag is found, update the entry
         if (res !== null) {
-          dbObject.collection("inventory").updateOne(
+          dbObject.collection(dbColl_CompInv).updateOne(
             { serviceTag: jsonObject.SystemInformation.SKU },
             {
               $set: {
@@ -134,7 +136,7 @@ function writeToInventoryColl(dbObject, jsonObject) {
           // If no entry with the same service tag is found, add a new entry
         } else {
           if (!err) {
-            dbObject.collection("inventory").insertOne(
+            dbObject.collection(dbColl_CompInv).insertOne(
               {
                 serviceTag: jsonObject.SystemInformation.SKU,
                 data: jsonObject,
@@ -160,7 +162,7 @@ function writeToInventoryColl(dbObject, jsonObject) {
 function getComponentDataArray(dbObject) {
   return new Promise((resolve, reject) => {
     dbObject
-      .collection("inventory")
+      .collection(dbColl_CompInv)
       .find()
       .toArray(function (err, docs) {
         if (err) {
@@ -439,6 +441,16 @@ async function getRedfishData(idracIps, db) {
  */
 function getMongoData(db) {
   let result = db.collection(dbColl_Servers).find().toArray();
+  return result;
+}
+
+// Retrieves server(s)' data for specified Service Tags from the database & returns it
+// as an array of JSON objects
+function getServersDataByTag(db, stArr) {
+  let result = db
+    .collection(dbColl_Servers)
+    .find({ serviceTag: { $in: stArr } })
+    .toArray();
   return result;
 }
 
@@ -789,6 +801,27 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 })
         .catch((error) => {
           console.log(`Caught error in findIdracsInIpRange: ${error.results}`);
           res.json({ status: false, message: error.message });
+        });
+    });
+
+    // API endpoint that will return server(s)' data for a given array of
+    // Service Tags
+    app.post("/getServersByTag", (req, res) => {
+      console.log("API to get requested servers is called..");
+      // Get array of Service Tags from the request body
+      let theseServiceTags = req.body.ServiceTagArr;
+
+      // Call function to do the database query for these nodes
+      getServersDataByTag(_db, theseServiceTags)
+        .then((results) => {
+          console.log("Success: data on requested servers sent back.");
+          res.send(results);
+        })
+        .catch((error) => {
+          console.log(
+            `Failure: caught error in getServersDataByTag: ${error.results}`
+          );
+          res.send([]);
         });
     });
 
