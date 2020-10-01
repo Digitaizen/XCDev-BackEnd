@@ -899,6 +899,29 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 })
         });
     });
 
+    // Fetch names of all the folders listed for Hypervisor on the XC Night Flyer Share
+    app.get("/getHypervisors", (req, res) => {
+      let source = "/mnt/bmr/FEAR/fip_cfg";
+
+      const getDirectories = (source) =>
+        readdirSync(source, { withFileTypes: true })
+          .filter((dirent) => dirent.isDirectory())
+          .map((dirent) => {
+            return {
+              value: dirent.name.match(/\[([^)]+)\]/)[1],
+              label: dirent.name,
+            };
+          });
+
+      let optionsHypervisor = getDirectories(source);
+
+      res.status(200).json({
+        success: true,
+        message: "Hypervisors successfully fetched",
+        results: optionsHypervisor,
+      });
+    });
+
     // Fetch names of all the folders listed for Factory Block on the XC Night Flyer Share
     // app.get("/getIsoFiles", (req, res) => {
     // let source = "";
