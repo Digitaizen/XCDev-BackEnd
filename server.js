@@ -963,7 +963,9 @@ MongoClient.connect(dbUrl, { useUnifiedTopology: true, poolSize: 10 })
         let files = readdirSync(dirPath);
         let arrayOfFiles = [];
         files.map((name) => {
-          let extension = name.endsWith("iso") && name.includes("BMR3");
+          let extension =
+            name.endsWith("iso") &&
+            (name.includes("BMR4") || name.includes("BMR_4"));
           if (extension === true) {
             arrayOfFiles.push(name);
           }
