@@ -43,7 +43,10 @@ parser.add_argument(
     help="GetSystemHWInventoryREDFISH.py -ip 192.168.0.120 -u root -p calvin -m y, this example will get only memory information. GetSystemHWInventoryREDFISH.py -ip 192.168.0.120 -u root -p calvin -c y -m y, this example will get only processor and memory information. GetSystemHWInventoryREDFISH.py -ip 192.168.0.120 -u root -p calvin -a y, this example will get all systemInformation: general systemInformation, processor, memory, fans, power supplies, hard drives, storage controllers, network devices",
 )
 parser.add_argument(
-    "-s", help='Get systemInformation only, pass in "y"', required=False
+    "-s", help='Get system information only, pass in "y"', required=False
+)
+parser.add_argument(
+    "-i", help='Get iDRAC information only, pass in "y"', required=False
 )
 parser.add_argument(
     "-m", help='Get memory information only, pass in "y"', required=False
@@ -184,6 +187,18 @@ def get_system_information():
             else:
                 idrac_inventory["SystemInformation"][i[0]] = i[1]
 
+def get_idrac_information():
+    response = requests.get(
+        "https://%s/redfish/v1/Managers/iDRAC.Embedded.1" % idrac_ip,
+        verify=False,
+        auth=(idrac_username, idrac_password),
+    )
+    data = response.json()
+    if response.status_code != 200:
+        print("\n- FAIL, get command failed, error is: %s" % data)
+        sys.exit()
+    else:        
+        idrac_inventory["SystemInformation"]["IdracFirmware"] = data["FirmwareVersion"]
 
 def get_memory_information():
     response = requests.get(
@@ -194,6 +209,7 @@ def get_memory_information():
     data = response.json()
     # print(data)
 
+    idrac_inventory["MemoryInformation"]["DimmCount"] = data["Members@odata.count"]
     for i in data["Members"]:
         dimm = i["@odata.id"].split("/")[-1]
         # print(dimm)
@@ -959,6 +975,8 @@ if __name__ == "__main__":
     check_supported_idrac_version()
     if args["s"]:
         get_system_information()
+    if args["i"]:
+        get_idrac_information()
     if args["m"]:
         get_memory_information()
     if args["c"]:
@@ -975,6 +993,7 @@ if __name__ == "__main__":
         get_network_information()
     if args["a"]:
         get_system_information()
+        get_idrac_information()
         get_memory_information()
         get_cpu_information()
         # get_fan_information()
