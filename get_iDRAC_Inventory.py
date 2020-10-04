@@ -49,6 +49,9 @@ parser.add_argument(
     "-i", help='Get iDRAC information only, pass in "y"', required=False
 )
 parser.add_argument(
+    "-fw", help='Get specified firmware information only, pass in "y"', required=False
+)
+parser.add_argument(
     "-m", help='Get memory information only, pass in "y"', required=False
 )
 parser.add_argument(
@@ -199,6 +202,21 @@ def get_idrac_information():
         sys.exit()
     else:        
         idrac_inventory["SystemInformation"]["IdracFirmware"] = data["FirmwareVersion"]
+
+def get_firmware_information():
+    response = requests.get(
+        "https://%s/redfish/v1/UpdateService/FirmwareInventory?$expand=.($levels=1)" % idrac_ip,
+        verify=False,
+        auth=(idrac_username, idrac_password),
+    )
+    data = response.json()
+    if response.status_code != 200:
+        print("\n- FAIL, get command failed, error is: %s" % data)
+        sys.exit()
+    else:
+        for i in data["Members"]:
+            if i["Name"] == "System CPLD":
+                idrac_inventory["SystemInformation"]["SystemCPLDversion"] = i["Version"]
 
 def get_memory_information():
     response = requests.get(
@@ -977,6 +995,8 @@ if __name__ == "__main__":
         get_system_information()
     if args["i"]:
         get_idrac_information()
+    if args["fw"]:
+        get_firmware_information()
     if args["m"]:
         get_memory_information()
     if args["c"]:
@@ -994,6 +1014,7 @@ if __name__ == "__main__":
     if args["a"]:
         get_system_information()
         get_idrac_information()
+        get_firmware_information()
         get_memory_information()
         get_cpu_information()
         # get_fan_information()
