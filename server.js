@@ -37,7 +37,7 @@ const { response } = require("express");
 
 // Declare the globals ////////////////////////////////////////////////////////
 const dbUrl = "mongodb://localhost:27017";
-const dbName = "dev";
+const dbName = "master";
 const dbColl_Servers = "servers";
 const dbColl_Users = "users";
 const dbColl_Inventory = "componentInventory";
