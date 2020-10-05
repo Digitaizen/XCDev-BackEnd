@@ -217,10 +217,6 @@ async function getRedfishData(idracIps, db) {
       let locationUrl =
         "https://" +
         item +
-        "/redfish/v1/Managers/System.Embedded.1/Attributes?$select=ServerTopology.*";
-      let codeNameUrl =
-        "https://" +
-        item +
         "/redfish/v1/Managers/iDRAC.Embedded.1/Attributes?$select=CurrentNIC.*";
 
       // Construct options to be used in fetch call
@@ -280,39 +276,7 @@ async function getRedfishData(idracIps, db) {
           // Store data from systems URL in iDRAC data object
           redfishDataObject["System"] = systemData;
 
-          /**
-           * DELLXCDEV-113
-           *
-           * Location scanning logic commented out in lines 161-186, 206-211, 224-248, 258, 271, 282
-           */
-          //   // Check if iDRAC is 14G or higher
-          //   let systemGeneration = redfishDataObject.System.hasOwnProperty("Oem")
-          //     ? redfishDataObject.System.Oem.Dell.DellSystem.SystemGeneration
-          //     : "";
-
-          //   // If iDRAC generation was scanned and 14G or higher, run location scan
-          //   if (
-          //     systemGeneration != "" &&
-          //     parseInt(systemGeneration.substring(0, 2)) >= 14
-          //   ) {
-          //     return fetch_retry(locationUrl, options, 3);
-          //   } else {
-          //     // Else, return "no location data" JSON
-          //     return { data: "no location data fetched" };
-          //   }
-          // })
-          // .then(response => {
-          //   if (response.ok) {
-          //     return response.json();
-          //   } else {
-          //     return { error: "No location data available" };
-          //   }
-          // })
-          // .then(locationData => {
-          //   // Store data from location URL in iDRAC data object
-          //   redfishDataObject["Location"] = locationData;
-
-          return fetch_retry(codeNameUrl, options, 3);
+          return fetch_retry(locationUrl, options, 3);
         })
         .then((response) => {
           if (response.ok) {
@@ -321,21 +285,35 @@ async function getRedfishData(idracIps, db) {
             return { error: "No location data available" };
           }
         })
-        .then((codeNameData) => {
+        .then((locationData) => {
           // Store data from codename URL in iDRAC data object
-          redfishDataObject["codeName"] = codeNameData;
+          redfishDataObject["Location"] = locationData;
 
           // If no generation was scanned, set generation variable to ""
           let systemGeneration = redfishDataObject.System.hasOwnProperty("Oem")
             ? redfishDataObject.System.Oem.Dell.DellSystem.SystemGeneration
             : "";
 
-          // // If no location was scanned, set location variable to "--"
-          // let serverLocation = redfishDataObject.Location.hasOwnProperty(
-          //   "Attributes"
-          // )
-          //   ? `${redfishDataObject.Location.Attributes["ServerTopology.1.DataCenterName"]}-${redfishDataObject.Location.Attributes["ServerTopology.1.RackName"]}-${redfishDataObject.Location.Attributes["ServerTopology.1.RackSlot"]}`
-          //   : "--";
+          // If no location was scanned, set location variable to "--"
+          let serverLocation = redfishDataObject.Location.hasOwnProperty(
+            "Attributes"
+          )
+            ? `${
+                redfishDataObject.Location.Attributes[
+                  "CurrentNIC.1.DNSRacName"
+                ].split("-")[1]
+              }-${
+                redfishDataObject.Location.Attributes[
+                  "CurrentNIC.1.DNSRacName"
+                ].split("-")[2]
+              }-${
+                redfishDataObject.Location.Attributes[
+                  "CurrentNIC.1.DNSRacName"
+                ].split("-")[3]
+              }`
+            : "--";
+
+          // console.log(serverLocation);
 
           // Add or update collection entry with iDRAC data object
           return db
@@ -348,31 +326,6 @@ async function getRedfishData(idracIps, db) {
                 }
                 // If an entry with the same service tag is found, update the entry
                 if (results !== null) {
-                  // // If no location data was scanned, don't update the location field
-                  // if (serverLocation == "--") {
-                  //   db.collection(dbColl_Servers).updateOne(
-                  //     { serviceTag: redfishDataObject.System.SKU },
-                  //     {
-                  //       $set: {
-                  //         ip: item,
-                  //         serviceTag: redfishDataObject.System.SKU,
-                  //         model: redfishDataObject.System.Model,
-                  //         hostname: redfishDataObject.System.HostName,
-                  //         generation: systemGeneration
-                  //       }
-                  //     },
-                  //     err => {
-                  //       if (err) {
-                  //         return console.log(err);
-                  //       }
-                  //       serverCount++;
-                  //       console.log(
-                  //         `Server # ${serverCount} @ ${item} updated in db`
-                  //       );
-                  //     }
-                  //   );
-                  //   // If location data was scanned, include location field in update query
-                  // } else {
                   db.collection(dbColl_Servers).updateOne(
                     { serviceTag: redfishDataObject.System.SKU },
                     {
@@ -383,7 +336,7 @@ async function getRedfishData(idracIps, db) {
                         model: redfishDataObject.System.Model,
                         hostname: redfishDataObject.System.HostName,
                         generation: systemGeneration,
-                        // location: serverLocation
+                        location: serverLocation,
                       },
                     },
                     (err) => {
@@ -396,7 +349,6 @@ async function getRedfishData(idracIps, db) {
                       );
                     }
                   );
-                  // }
                   // If no entry with the same service tag is found, add a new entry
                 } else {
                   if (!err) {
@@ -408,7 +360,7 @@ async function getRedfishData(idracIps, db) {
                         model: redfishDataObject.System.Model,
                         hostname: redfishDataObject.System.HostName,
                         generation: systemGeneration,
-                        // location: serverLocation,
+                        location: serverLocation,
                         status: "available",
                         timestamp: "",
                         comments: "",
