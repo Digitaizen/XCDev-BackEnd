@@ -7,6 +7,7 @@ const { readdirSync, statSync } = require("fs");
 const bmrValues = "bmr_payload_values.txt";
 const bmrIsoProcess = require("../boot_to_BMR");
 const { exec, execFile } = require("child_process");
+const Shell = require("node-powershell");
 
 // Global variables
 const dbColl_Servers = "servers";
@@ -19,6 +20,30 @@ function readLDfile(fName) {
     .replace(/^(?=\n)$|^\s*|\s*$|\n\n+/gm, "")
     .split("\n");
   return linesArr;
+}
+
+async function getFactoryBlock() {
+  return new Promise(function (resolve, reject) {
+    let factoryBlock = [];
+
+    const ps = new Shell({
+      executionPolicy: "Bypass",
+      noProfile: true,
+    });
+
+    ps.addCommand("./shareDriveAccess.ps1");
+    ps.invoke()
+      .then((output) => {
+        factoryBlock.push(output);
+        console.log(output);
+      })
+      .catch((err) => {
+        console.log(err);
+        ps.dispose();
+      });
+
+    resolve(factoryBlock);
+  });
 }
 
 // Fetch servers checked out by a specified user
@@ -82,6 +107,29 @@ router.get("/getFactoryBlock", (req, res) => {
   });
 });
 
+// Fetch names of all the folders listed for Hypervisor on the XC Night Flyer Share
+router.get("/getHypervisors", (req, res) => {
+  let source = "/mnt/bmr/FEAR/fip_cfg";
+
+  const getDirectories = (source) =>
+    readdirSync(source, { withFileTypes: true })
+      .filter((dirent) => dirent.isDirectory())
+      .map((dirent) => {
+        return {
+          value: dirent.name.match(/\[([^)]+)\]/)[1],
+          label: dirent.name,
+        };
+      });
+
+  let optionsHypervisor = getDirectories(source);
+
+  res.status(200).json({
+    success: true,
+    message: "Hypervisors successfully fetched",
+    results: optionsHypervisor,
+  });
+});
+
 // Fetch names of .iso files from given directory path
 router.get("/getBmrIso", (req, res) => {
   let source = "/mnt/bmr";
@@ -90,7 +138,9 @@ router.get("/getBmrIso", (req, res) => {
     let files = readdirSync(dirPath);
     let arrayOfFiles = [];
     files.map((name) => {
-      let extension = name.endsWith("iso") && name.includes("BMR3");
+      let extension =
+        name.endsWith("iso") &&
+        (name.includes("BMR4") || name.includes("BMR_4"));
       if (extension === true) {
         arrayOfFiles.push(name);
       }

@@ -11,7 +11,7 @@ const mongoose = require("mongoose");
 
 // Global variables
 const dbColl_Servers = "servers";
-const lab_ip_range = "100.80.144.0-100.80.148.255";
+const lab_ip_range = "100.80.144.0-100.80.144.25";
 const file_idracs = "IPrangeScan-iDRACs.txt";
 const file_others = "IPrangeScan-Others.txt";
 const iDracLogin = "root";
@@ -47,6 +47,10 @@ function readLDfile(fName) {
   return linesArr;
 }
 
+/**
+ * Updates MongoDB collection with data from iDRAC Redfish API
+ * @param {array} idracIps array containing IP addresses of active iDRACs
+ */
 async function getRedfishData(idracIps, db) {
   try {
     // Initialize count of servers being added/updated to db
@@ -63,10 +67,6 @@ async function getRedfishData(idracIps, db) {
       let systemUrl =
         "https://" + item + "/redfish/v1/Systems/System.Embedded.1";
       let locationUrl =
-        "https://" +
-        item +
-        "/redfish/v1/Managers/System.Embedded.1/Attributes?$select=ServerTopology.*";
-      let codeNameUrl =
         "https://" +
         item +
         "/redfish/v1/Managers/iDRAC.Embedded.1/Attributes?$select=CurrentNIC.*";
@@ -128,7 +128,7 @@ async function getRedfishData(idracIps, db) {
           // Store data from systems URL in iDRAC data object
           redfishDataObject["System"] = systemData;
 
-          return fetch_retry(codeNameUrl, options, 3);
+          return fetch_retry(locationUrl, options, 3);
         })
         .then((response) => {
           if (response.ok) {
@@ -137,14 +137,33 @@ async function getRedfishData(idracIps, db) {
             return { error: "No location data available" };
           }
         })
-        .then((codeNameData) => {
+        .then((locationData) => {
           // Store data from codename URL in iDRAC data object
-          redfishDataObject["codeName"] = codeNameData;
+          redfishDataObject["Location"] = locationData;
 
           // If no generation was scanned, set generation variable to ""
           let systemGeneration = redfishDataObject.System.hasOwnProperty("Oem")
             ? redfishDataObject.System.Oem.Dell.DellSystem.SystemGeneration
             : "";
+
+          // If no location was scanned, set location variable to "--"
+          let serverLocation = redfishDataObject.Location.hasOwnProperty(
+            "Attributes"
+          )
+            ? `${
+                redfishDataObject.Location.Attributes[
+                  "CurrentNIC.1.DNSRacName"
+                ].split("-")[1]
+              }-${
+                redfishDataObject.Location.Attributes[
+                  "CurrentNIC.1.DNSRacName"
+                ].split("-")[2]
+              }-${
+                redfishDataObject.Location.Attributes[
+                  "CurrentNIC.1.DNSRacName"
+                ].split("-")[3]
+              }`
+            : "--";
 
           // Add or update collection entry with iDRAC data object
           return db
@@ -167,6 +186,7 @@ async function getRedfishData(idracIps, db) {
                         model: redfishDataObject.System.Model,
                         hostname: redfishDataObject.System.HostName,
                         generation: systemGeneration,
+                        location: serverLocation,
                       },
                     },
                     (err) => {
@@ -189,6 +209,7 @@ async function getRedfishData(idracIps, db) {
                         model: redfishDataObject.System.Model,
                         hostname: redfishDataObject.System.HostName,
                         generation: systemGeneration,
+                        location: serverLocation,
                         status: "available",
                         timestamp: "",
                         comments: "",
