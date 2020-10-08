@@ -11,7 +11,7 @@ const mongoose = require("mongoose");
 
 // Global variables
 const dbColl_Servers = "servers";
-const lab_ip_range = "100.80.144.0-100.80.144.25";
+const lab_ip_range = "100.80.144.0-100.80.148.255";
 const file_idracs = "IPrangeScan-iDRACs.txt";
 const file_others = "IPrangeScan-Others.txt";
 const iDracLogin = "root";
