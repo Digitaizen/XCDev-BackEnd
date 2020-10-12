@@ -21,7 +21,7 @@ const inventoryRouter = require("./api/inventoryRoutes");
 const mongoUtil = require("./mongoUtil");
 
 // Declare the globals ////////////////////////////////////////////////////////
-const dbName = "dev";
+const dbName = "root";
 const dbColl_Users = "users";
 const portNum = 8080;
 const corsOptions = {
