@@ -57,11 +57,11 @@ router.get("/getUserServers/:name", (req, res) => {
       if (err) {
         res.status(500).json({ success: false, message: err });
       } else {
-        // If firmware version is older than 3.21.26.22, exclude server from results
+        // If firmware version is older than 4.00.00.00, exclude server from results
         let resultArray = servers.filter(
           (server) =>
             server.firmwareVersion !== undefined &&
-            parseInt(server.firmwareVersion.split(".").join("")) >= 3212622
+            parseInt(server.firmwareVersion.split(".").join("")) >= 4000000
         );
         // Return array of servers belonging to specified user
         res.status(200).json({
