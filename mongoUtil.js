@@ -1,5 +1,6 @@
 const MongoClient = require("mongodb").MongoClient;
 const url = "mongodb://localhost:27017";
+const dbName = "root";
 
 var _db;
 
@@ -13,7 +14,7 @@ module.exports = {
           if (err) {
             reject({ success: false, message: err });
           } else {
-            _db = client.db("dev");
+            _db = client.db(dbName);
             resolve({ success: true, message: "Successfully connected to db" });
           }
         }
