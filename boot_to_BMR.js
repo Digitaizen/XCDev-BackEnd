@@ -7,6 +7,7 @@ const base64 = require("base-64");
 const fetch = require("node-fetch");
 const { resolve } = require("path");
 const { response } = require("express");
+const { reject } = require("async");
 
 // Declare variables >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 const idrac_username = "root";
@@ -14,6 +15,14 @@ const idrac_password = "calvin";
 let concrete_job_uri = "";
 
 // Define functions >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+function sleep(milliseconds) {
+    const date = Date.now();
+    let currentDate = null;
+    do {
+        currentDate = Date.now();
+    } while (currentDate - date < milliseconds);
+}
+
 function checkRedfishSupport(node_ip) {
     return new Promise((resolve, reject) => {
         console.log("checkRedfishSupport function called for ", node_ip); //debugging
@@ -423,6 +432,16 @@ function insertVirtualMediaCD(node_ip, img_path) {
         // Build URL string to fetch to the query; for CD in this case
         let url = `https://${node_ip}/redfish/v1/Managers/iDRAC.Embedded.1/VirtualMedia/CD/Actions/VirtualMedia.InsertMedia`;
 
+        let payload = {};
+        if (img_path.includes("cifs"))
+            payload = { Image: img_path };
+        else
+            payload = {
+                Image: img_path,
+                Inserted: true,
+                WriteProtected: true,
+            };
+
         // Construct options to be used in fetch call
         const agent = new https.Agent({
             rejectUnauthorized: false
@@ -436,11 +455,7 @@ function insertVirtualMediaCD(node_ip, img_path) {
                     `${idrac_username}:${idrac_password}`
                 )}`
             },
-            body: JSON.stringify({
-                Image: img_path,
-                Inserted: true,
-                WriteProtected: true,
-            }),
+            body: JSON.stringify(payload),
             agent: agent
         };
 
@@ -450,7 +465,7 @@ function insertVirtualMediaCD(node_ip, img_path) {
                 if (response.status != 204) {
                     reject({
                         success: false,
-                        message: `FAIL: error message is ${response.statusText}`
+                        message: `FAIL: error ${response.status} on insert and its message is ${response.statusText}`
                     });
                 } else {
                     resolve({
@@ -499,7 +514,7 @@ function ejectVirtualMediaCD(node_ip) {
                 if (response.status != 204) {
                     reject({
                         success: false,
-                        message: `FAIL: error message is ${response.statusText}`
+                        message: `FAIL: error ${response.status} on eject and its message is ${response.statusText}`
                     });
                 } else {
                     resolve({
@@ -545,7 +560,7 @@ function checkVirtualMediaCdStatus(node_ip) {
             .then((response) => response.json())
             .then((data) => {
                 resolve({
-                    success: data["Inserted"],
+                    success: true, //data["Inserted"],
                     message: `${data["Inserted"]}`
                 });
             })
@@ -553,6 +568,184 @@ function checkVirtualMediaCdStatus(node_ip) {
                 reject({
                     success: false,
                     message: `FAIL: Fetch in checkVirtualMediaCDStatus failed on ${node_ip}: ${error}`
+                });
+            });
+    });
+}
+
+function setNextOneTimeBootVirtualMediaDevice(idrac_ip) {
+    return new Promise((resolve, reject) => {
+        console.log("setNextOneTimeBootVirtualMediaDevice function called for ", idrac_ip);
+
+        // Build URL string to fetch to the query
+        let url = `https://${idrac_ip}/redfish/v1/Managers/iDRAC.Embedded.1/Actions/Oem/EID_674_Manager.ImportSystemConfiguration`;
+
+        // Construct options to be used in fetch call
+        const agent = new https.Agent({
+            rejectUnauthorized: false
+        });
+
+        let payload = { "ShareParameters": { "Target": "ALL" }, "ImportBuffer": "<SystemConfiguration><Component FQDD=\"iDRAC.Embedded.1\"><Attribute Name=\"ServerBoot.1#BootOnce\">Enabled</Attribute><Attribute Name=\"ServerBoot.1#FirstBootDevice\">VCD-DVD</Attribute></Component></SystemConfiguration>" };
+
+        let options = {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Basic ${base64.encode(
+                    `${idrac_username}:${idrac_password}`
+                )}`
+            },
+            body: JSON.stringify(payload),
+            agent: agent
+        };
+
+        // Make fetch call on the URL
+        fetch(url, options)
+            // .then(response => console.log(response))
+            .then((response) => {
+                if (response.status != 202) {
+                    reject({
+                        success: false,
+                        message: `FAIL: error ${response.status} on set next boot VM and its message is ${response.statusText}`
+                    });
+                } else {
+                    resolve({
+                        success: true,
+                        message: `PASS`
+                    });
+                }
+            })
+            .catch(error => {
+                reject({
+                    success: false,
+                    message: `FAIL: Fetch in setNextOneTimeBootVirtualMediaDevice failed on ${node_ip}: ${error}`
+                });
+            });
+    })
+}
+
+function deleteJobQueue(node_ip, arg) {
+    return new Promise((resolve, reject) => {
+        console.log("deleteJobQueue function called for ", idrac_ip);
+
+        // Build URL string to fetch to the query
+        let url = `https://${node_ip}/redfish/v1/Dell/Managers/iDRAC.Embedded.1/DellJobService/Actions/DellJobService.DeleteJobQueue`;
+
+        // Construct options to be used in fetch call
+        const agent = new https.Agent({
+            rejectUnauthorized: false
+        });
+
+        let payload;
+        if (arg.includes("JID_"))
+            payload = { "JobID": arg };
+        else if (arg === "CLEARALL")
+            payload = { "JobID": "JID_CLEARALL" };
+        else if (arg === "CLEARALL_FORCE")
+            payload = { "JobID": "JID_CLEARALL_FORCE" };
+
+        let options = {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Basic ${base64.encode(
+                    `${idrac_username}:${idrac_password}`
+                )}`
+            },
+            body: JSON.stringify(payload),
+            agent: agent
+        };
+
+        // Make fetch call on the URL
+        fetch(url, options)
+            // .then(response => console.log(response)) //debugging
+            .then((response) => {
+                if (response.status != 200)
+                    (response) => response.json()
+                        .then((data) => {
+                            reject({
+                                success: false,
+                                message: `- FAIL, deleteJobQueue action failed, status code is ${response.statusText}. \n- POST command failure is: ${data}`
+                            });
+                        });
+                else {
+                    // let msg = "";
+                    if (arg.includes("JID_"))
+                        console.log(`- PASS: DeleteJobQueue action passed to clear job ID ${arg}, status code 200 returned`);
+                    else if (arg === "CLEARALL") {
+                        console.log(`- PASS: DeleteJobQueue action passed to clear the job queue, status code 200 returned`);
+                        resolve({
+                            success: true,
+                            message: `PASS`
+                        });
+                    } else if (arg === "CLEARALL_FORCE") {
+                        console.log(`- PASS: DeleteJobQueue action passed to clear the job queue and restart Lifecycle Controller services, status code 200 returned`);
+                        sleep(10000);
+                        console.log("- WARNING, Lifecycle Controller services restarted. Script will loop checking the status of Lifecycle Controller until Ready state");
+                        sleep(60000);
+                        while (true) {
+                            url = `https://${node_ip}/redfish/v1/Dell/Managers/iDRAC.Embedded.1/DellLCService/Actions/DellLCService.GetRemoteServicesAPIStatus`;
+
+                            // Construct options to be used in fetch call
+                            const agent = new https.Agent({
+                                rejectUnauthorized: false
+                            });
+                            payload = {};
+                            let options = {
+                                method: "POST",
+                                headers: {
+                                    "Content-Type": "application/json",
+                                    Authorization: `Basic ${base64.encode(
+                                        `${idrac_username}:${idrac_password}`
+                                    )}`
+                                },
+                                body: JSON.stringify(payload),
+                                agent: agent
+                            };
+                            // Make fetch call on the URL
+                            fetch(url, options)
+                                .then(response => response.json().then(data => ({ status: response.status, data: data })))
+                                // .then(resObj => console.log(resObj)) //debugging
+                                .then((resObj) => {
+                                    if (resObj.status != 200) {
+                                        reject({
+                                            success: false,
+                                            message: `-FAIL, POST command failed, status code is  ${resObj.status}, \n
+                                            -POST command failure results: ${resObj.data}`
+                                        });
+                                    } else {
+                                        let lc_status = resObj.data["LCStatus"];
+                                        let server_status = resObj.data["Status"];
+                                        if (lc_status === "Ready" && server_status === "Ready") {
+                                            console.log("- PASS, Lifecycle Controller services are in ready state");
+                                            resolve({
+                                                success: true,
+                                                message: `PASS`
+                                            });
+                                        } else {
+                                            console.log("- WARNING, Lifecycle Controller services not in ready state, polling again");
+                                            sleep(20000);
+                                        };
+                                    };
+                                })
+                                .catch(error => {
+                                    reject({
+                                        success: false,
+                                        message: `FAIL: Fetch on GetRemoteServicesAPIStatus failed on ${node_ip}: ${error}`
+                                    });
+                                });
+                        };
+                    };
+                    // resolve({
+                    //     success: true,
+                    //     message: msg
+                    // });
+                };
+            })
+            .catch(error => {
+                reject({
+                    success: false,
+                    message: `FAIL: Fetch in deleteJobQueue failed on ${node_ip}: ${error}`
                 });
             });
     });
@@ -680,8 +873,8 @@ function mountNetworkImageOnNodes(idrac_ips, share_ip, share_type, share_name, i
                         message: `CATCH in mountNetworkImageOnNodes: ${error.message}`
                     });
                 });
-        })
-    })
+        });
+    });
 }
 
 function checkCurrentPowerState(node_ip) {
@@ -791,6 +984,174 @@ function rebootSelectedNodes(idrac_ips) {
     });
 }
 
+// Call this function with an array of IPs and image path to mount Virtual Media ISO image from a share. If any of the
+// functions fail, it will as well.
+function insertVirtualMediaOnNodes(idrac_ips, image_path) {
+    return new Promise((resolve, reject) => {
+        console.log("insertVirtualMediaOnNodes function called for ", idrac_ips);   //debugging
+        let insertedCounter = 0;
+
+        idrac_ips.forEach(idrac_ip => {
+            checkRedfishSupport(idrac_ip)
+                .then(response => {
+                    console.log(`checkRedfishSupport result for ${idrac_ip} is: ${response.message}`);
+                    if (response.success) {
+                        checkVirtualMediaCdStatus(idrac_ip)
+                            .then(response => {
+                                console.log(`checkVirtualMediaCdStatus result for ${idrac_ip} is inserted: ${response.message}`);
+                                if (response.message === "true") {
+                                    ejectVirtualMediaCD(idrac_ip)
+                                        .then(response => {
+                                            console.log(`ejectVirtualMediaCD result for ${idrac_ip} is: ${response.message}`);
+                                            if (response.success) {
+                                                insertVirtualMediaCD(idrac_ip, image_path)
+                                                    .then(response => {
+                                                        console.log(`insertVirtualMediaCD result for ${idrac_ip} is: ${response.message}`);
+                                                        if (response.success) {
+                                                            deleteJobQueue(idrac_ip, "CLEARALL")
+                                                                .then(response => {
+                                                                    console.log(`deleteJobQueue result for ${idrac_ip} is: ${response.message}`);
+                                                                    if (response.success) {
+                                                                        setNextOneTimeBootVirtualMediaDevice(idrac_ip)
+                                                                            .then(response => {
+                                                                                console.log(`setNextOneTimeBootVirtualMediaDevice result for ${idrac_ip} is: ${response.message}`);
+                                                                                if (!response.success) {
+                                                                                    reject({
+                                                                                        success: false,
+                                                                                        message: response.message
+                                                                                    });
+                                                                                } else {
+                                                                                    insertedCounter++;
+                                                                                    if (insertedCounter == idrac_ips.length) {
+                                                                                        if (idrac_ips.length == 1)
+                                                                                            resolve({
+                                                                                                success: true,
+                                                                                                message: `---"${image_path}" has been successfuly inserted on the selected node and set to boot from it.---`
+                                                                                            });
+                                                                                        else
+                                                                                            resolve({
+                                                                                                success: true,
+                                                                                                message: `---"${image_path}" has been successfuly inserted on all selected nodes and set to boot from it.---`
+                                                                                            });
+                                                                                    }
+                                                                                }
+                                                                            });
+                                                                    }
+                                                                })
+
+                                                        } else {
+                                                            reject({
+                                                                success: false,
+                                                                message: response.message
+                                                            });
+                                                        }
+                                                    })
+                                                    .catch(error => {
+                                                        console.log(`CATCH in insertVirtualMediaOnNodes: ${error.message}`);
+                                                        reject({
+                                                            success: false,
+                                                            message: `CATCH in insertVirtualMediaOnNodes: ${error.message}`
+                                                        });
+                                                    })
+                                            } else {
+                                                reject({
+                                                    success: false,
+                                                    message: response.message
+                                                });
+                                            }
+                                        })
+                                        .catch(error => {
+                                            console.log(`CATCH in insertVirtualMediaOnNodes: ${error.message}`);
+                                            reject({
+                                                success: false,
+                                                message: `CATCH in insertVirtualMediaOnNodes: ${error.message}`
+                                            });
+                                        })
+                                } else {
+                                    insertVirtualMediaCD(idrac_ip, image_path)
+                                        .then(response => {
+                                            console.log(`insertVirtualMediaCD result for ${idrac_ip} is: ${response.message}`);
+                                            if (response.success) {
+                                                deleteJobQueue(idrac_ip, "CLEARALL")
+                                                    .then(response => {
+                                                        console.log(`deleteJobQueue result for ${idrac_ip} is: ${response.message}`);
+                                                        if (response.success) {
+                                                            setNextOneTimeBootVirtualMediaDevice(idrac_ip)
+                                                                .then(response => {
+                                                                    console.log(`setNextOneTimeBootVirtualMediaDevice result for ${idrac_ip} is: ${response.message}`);
+                                                                    if (!response.success) {
+                                                                        reject({
+                                                                            success: false,
+                                                                            message: response.message
+                                                                        });
+                                                                    } else {
+                                                                        insertedCounter++;
+                                                                        if (insertedCounter == idrac_ips.length) {
+                                                                            if (idrac_ips.length == 1)
+                                                                                resolve({
+                                                                                    success: true,
+                                                                                    message: `---"${image_path}" has been successfuly inserted on the selected node and set to boot from it.---`
+                                                                                });
+                                                                            else
+                                                                                resolve({
+                                                                                    success: true,
+                                                                                    message: `---"${image_path}" has been successfuly inserted on all selected nodes and set to boot from it.---`
+                                                                                });
+                                                                        }
+                                                                    }
+                                                                });
+                                                        }
+                                                    })
+
+                                            } else {
+                                                reject({
+                                                    success: false,
+                                                    message: response.message
+                                                });
+                                            }
+                                        })
+                                        .catch(error => {
+                                            console.log(`CATCH in insertVirtualMediaOnNodes: ${error.message}`);
+                                            reject({
+                                                success: false,
+                                                message: `CATCH in insertVirtualMediaOnNodes: ${error.message}`
+                                            });
+                                        })
+                                        .catch(error => {
+                                            console.log(`CATCH in insertVirtualMediaCD: ${error.message}`);
+                                            reject({
+                                                success: false,
+                                                message: `CATCH in insertVirtualMediaCD: ${error.message}`
+                                            });
+                                        })
+                                }
+                            })
+                            .catch(error => {
+                                console.log(`CATCH in insertVirtualMediaCD: ${error.message}`);
+                                reject({
+                                    success: false,
+                                    message: `CATCH in insertVirtualMediaCD: ${error.message}`
+                                });
+                            })
+
+                    } else {
+                        reject({
+                            success: false,
+                            message: `iDRAC version installed on ${idrac_ip} does not support this functionality via Redfish`
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.log(`CATCH in insertVirtualMediaCD: ${error.message}`);
+                    reject({
+                        success: false,
+                        message: `CATCH in insertVirtualMediaCD: ${error.message}`
+                    });
+                });
+        });
+    });
+}
+
 // Run main/test module's functions >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 // Array with two iDRAC IPs, one w/new fw w/support for RF and another without
 // // const ip_arr = ["100.80.144.128", "100.80.148.61"]
@@ -801,6 +1162,8 @@ function rebootSelectedNodes(idrac_ips) {
 // let image_name = "BMR_DELL_120319.iso";
 // let user_name = "nutanix_admin";
 // let user_pass = "raid4us!";
+// let idrac_ip = "100.80.144.128";
+// let img_path = "cifs://nutanix_admin:raid4us!@10.211.4.215/dropbox/dl/WIMs/XC/RASR_BMR_4.1_Test_Only_For_XC_Automation.iso";
 
 // // Example of calling mountNetworkImageOnNodes then rebootSelectedNodes functions from server.js
 // mountNetworkImageOnNodes(ip_arr, share_ip, share_type, share_name, image_name, user_name, user_pass)
@@ -911,11 +1274,29 @@ function rebootSelectedNodes(idrac_ips) {
 //     });
 
 
-// insertVirtualMediaCD(idrac_ip, "//10.211.4.215/Nightflyer/_14G/BMR.ISO/BMR_DELL_120319.iso")
+// insertVirtualMediaCD(idrac_ip, img_path)
 //     .then(response => console.log(`insertVirtualMediaCD result: ${response.message}`))
 //     .catch(error => {
 //         console.log(`FAIL: insertVirtualMediaCD result: ${error.message}`);
 //     })
 
+// deleteJobQueue(idrac_ip, "CLEARALL")
+//     .then(response => console.log(`deleteJobQueue for ${idrac_ip} result: ${response.message}`))
+//     .catch(error => {
+//         console.log(`FAIL: deleteJobQueue result: ${error.message}`);
+//     });
 
-module.exports = { mountNetworkImageOnNodes, rebootSelectedNodes };
+// insertVirtualMediaOnNodes(ip_arr, img_path)
+//     .then(response => {
+//         console.log(`insertVirtualMediaOnNodes for ${idrac_ip} result: ${response.message}`);
+//         rebootSelectedNodes(ip_arr)
+//             .then(response => console.log(`rebootSelectedNodes for ${idrac_ip} result: ${response.message}`))
+//             .catch(error => {
+//                 console.log(`FAIL: rebootSelectedNodes result: ${error.message}`);
+//             });
+//     })
+//     .catch(error => {
+//         console.log(`FAIL: insertVirtualMediaOnNodes result: ${error.message}`);
+//     });
+
+module.exports = { insertVirtualMediaOnNodes, rebootSelectedNodes };
