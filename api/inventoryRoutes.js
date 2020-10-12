@@ -7,6 +7,7 @@ const { exec, execFile } = require("child_process");
 
 // Global variables
 const dbColl_Inventory = "componentInventory";
+const dbColl_Servers = "servers";
 const file_idracs = "IPrangeScan-iDRACs.txt";
 const iDracLogin = "root";
 const iDracPassword = "calvin";
