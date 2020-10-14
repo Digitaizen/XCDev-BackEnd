@@ -1,4 +1,4 @@
-/dropbox/dl/WIMs/XC
+//10.211.4.215/dropbox/dl/WIMs/XC
 SVC_Auto_Image
 MustChange2!
 cifs://SVC_Auto_Image:MustChange2!@10.211.4.215/dropbox/dl/WIMs/XC/
