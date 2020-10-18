@@ -1,5 +1,4 @@
-10.211.4.215
-/dropbox/dl/WIMs/XC
-CIFS
-nutanix_admin
-raid4us!
+//10.211.4.215/dropbox/dl/WIMs/XC
+SVC_Auto_Image
+MustChange2!
+cifs://SVC_Auto_Image:MustChange2!@10.211.4.215/dropbox/dl/WIMs/XC/

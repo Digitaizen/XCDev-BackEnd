@@ -23,7 +23,13 @@ const mongoUtil = require("./mongoUtil");
 // Declare the globals ////////////////////////////////////////////////////////
 const dbName = "root";
 const dbColl_Users = "users";
-const portNum = 8080;
+let portNum = 8080;
+// If not in production, set port number to dev environment variable
+if (process.env.NODE_ENV !== "production") {
+  require("dotenv").config();
+  portNum = process.env.devPort;
+}
+
 const corsOptions = {
   origin: [
     "http://localhost:3000",
