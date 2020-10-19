@@ -991,167 +991,201 @@ function insertVirtualMediaOnNodes(idrac_ips, image_path) {
         console.log("insertVirtualMediaOnNodes function called for ", idrac_ips);   //debugging
         let insertedCounter = 0;
 
-        idrac_ips.forEach(idrac_ip => {
-            checkRedfishSupport(idrac_ip)
-                .then(response => {
-                    console.log(`checkRedfishSupport result for ${idrac_ip} is: ${response.message}`);
-                    if (response.success) {
-                        checkVirtualMediaCdStatus(idrac_ip)
-                            .then(response => {
-                                console.log(`checkVirtualMediaCdStatus result for ${idrac_ip} is inserted: ${response.message}`);
-                                if (response.message === "true") {
-                                    ejectVirtualMediaCD(idrac_ip)
-                                        .then(response => {
-                                            console.log(`ejectVirtualMediaCD result for ${idrac_ip} is: ${response.message}`);
-                                            if (response.success) {
-                                                insertVirtualMediaCD(idrac_ip, image_path)
-                                                    .then(response => {
-                                                        console.log(`insertVirtualMediaCD result for ${idrac_ip} is: ${response.message}`);
-                                                        if (response.success) {
-                                                            deleteJobQueue(idrac_ip, "CLEARALL")
-                                                                .then(response => {
-                                                                    console.log(`deleteJobQueue result for ${idrac_ip} is: ${response.message}`);
-                                                                    if (response.success) {
-                                                                        setNextOneTimeBootVirtualMediaDevice(idrac_ip)
-                                                                            .then(response => {
-                                                                                console.log(`setNextOneTimeBootVirtualMediaDevice result for ${idrac_ip} is: ${response.message}`);
-                                                                                if (!response.success) {
-                                                                                    reject({
-                                                                                        success: false,
-                                                                                        message: response.message
-                                                                                    });
-                                                                                } else {
-                                                                                    insertedCounter++;
-                                                                                    if (insertedCounter == idrac_ips.length) {
-                                                                                        if (idrac_ips.length == 1)
-                                                                                            resolve({
-                                                                                                success: true,
-                                                                                                message: `---"${image_path}" has been successfuly inserted on the selected node and set to boot from it.---`
-                                                                                            });
-                                                                                        else
-                                                                                            resolve({
-                                                                                                success: true,
-                                                                                                message: `---"${image_path}" has been successfuly inserted on all selected nodes and set to boot from it.---`
-                                                                                            });
-                                                                                    }
-                                                                                }
-                                                                            });
-                                                                    }
-                                                                })
-
-                                                        } else {
+        try {
+            idrac_ips.forEach(idrac_ip => {
+                // checkRedfishSupport(idrac_ip)
+                //     .then(response => {
+                //         console.log(`checkRedfishSupport result for ${idrac_ip} is: ${response.message}`);
+                // if (response.success) {
+                checkVirtualMediaCdStatus(idrac_ip)
+                    .then(response => {
+                        console.log(`checkVirtualMediaCdStatus result for ${idrac_ip} is inserted: ${response.message}`);
+                        if (response.message === "true") {
+                            ejectVirtualMediaCD(idrac_ip)
+                                .then(response => {
+                                    console.log(`ejectVirtualMediaCD result for ${idrac_ip} is: ${response.message}`);
+                                    if (response.success) {
+                                        insertVirtualMediaCD(idrac_ip, image_path)
+                                            .then(response => {
+                                                console.log(`insertVirtualMediaCD result for ${idrac_ip} is: ${response.message}`);
+                                                if (response.success) {
+                                                    // deleteJobQueue(idrac_ip, "CLEARALL")
+                                                    //     .then(response => {
+                                                    //         console.log(`deleteJobQueue result for ${idrac_ip} is: ${response.message}`);
+                                                    //         if (response.success) {
+                                                    setNextOneTimeBootVirtualMediaDevice(idrac_ip)
+                                                        .then(response => {
+                                                            console.log(`setNextOneTimeBootVirtualMediaDevice result for ${idrac_ip} is: ${response.message}`);
+                                                            if (!response.success) {
+                                                                reject({
+                                                                    success: false,
+                                                                    message: response.message
+                                                                });
+                                                            } else {
+                                                                insertedCounter++;
+                                                                if (insertedCounter == idrac_ips.length) {
+                                                                    if (idrac_ips.length == 1)
+                                                                        resolve({
+                                                                            success: true,
+                                                                            message: `---"${image_path}" has been successfuly inserted on the selected node and set to boot from it.---`
+                                                                        });
+                                                                    else
+                                                                        resolve({
+                                                                            success: true,
+                                                                            message: `---"${image_path}" has been successfuly inserted on all selected nodes and set to boot from it.---`
+                                                                        });
+                                                                }
+                                                            }
+                                                        }) 
+                                                        .catch(error => {
+                                                            console.log(`CATCH in setNextOneTimeBootVirtualMediaDevice: ${error.message}`);
                                                             reject({
                                                                 success: false,
-                                                                message: response.message
+                                                                message: `CATCH in setNextOneTimeBootVirtualMediaDevice: ${error.message}`
                                                             });
-                                                        }
-                                                    })
-                                                    .catch(error => {
-                                                        console.log(`CATCH in insertVirtualMediaOnNodes: ${error.message}`);
-                                                        reject({
-                                                            success: false,
-                                                            message: `CATCH in insertVirtualMediaOnNodes: ${error.message}`
                                                         });
-                                                    })
-                                            } else {
+                                                    //     }
+                                                    // })
+                                                    // .catch(error => {
+                                                    //     console.log(`CATCH in deleteJobQueue: ${error.message}`);
+                                                    //     reject({
+                                                    //         success: false,
+                                                    //         message: `CATCH in deleteJobQueue: ${error.message}`
+                                                    //     });
+                                                    // });
+                                                } else {
+                                                    reject({
+                                                        success: false,
+                                                        message: response.message
+                                                    });
+                                                }
+                                            }) 
+                                            .catch(error => {
+                                                console.log(`CATCH in insertVirtualMediaCD: ${error.message}`);
                                                 reject({
                                                     success: false,
-                                                    message: response.message
+                                                    message: `CATCH in insertVirtualMediaCD: ${error.message}`
                                                 });
-                                            }
-                                        })
-                                        .catch(error => {
-                                            console.log(`CATCH in insertVirtualMediaOnNodes: ${error.message}`);
-                                            reject({
-                                                success: false,
-                                                message: `CATCH in insertVirtualMediaOnNodes: ${error.message}`
-                                            });
-                                        })
-                                } else {
-                                    insertVirtualMediaCD(idrac_ip, image_path)
-                                        .then(response => {
-                                            console.log(`insertVirtualMediaCD result for ${idrac_ip} is: ${response.message}`);
-                                            if (response.success) {
-                                                deleteJobQueue(idrac_ip, "CLEARALL")
-                                                    .then(response => {
-                                                        console.log(`deleteJobQueue result for ${idrac_ip} is: ${response.message}`);
-                                                        if (response.success) {
-                                                            setNextOneTimeBootVirtualMediaDevice(idrac_ip)
-                                                                .then(response => {
-                                                                    console.log(`setNextOneTimeBootVirtualMediaDevice result for ${idrac_ip} is: ${response.message}`);
-                                                                    if (!response.success) {
-                                                                        reject({
-                                                                            success: false,
-                                                                            message: response.message
-                                                                        });
-                                                                    } else {
-                                                                        insertedCounter++;
-                                                                        if (insertedCounter == idrac_ips.length) {
-                                                                            if (idrac_ips.length == 1)
-                                                                                resolve({
-                                                                                    success: true,
-                                                                                    message: `---"${image_path}" has been successfuly inserted on the selected node and set to boot from it.---`
-                                                                                });
-                                                                            else
-                                                                                resolve({
-                                                                                    success: true,
-                                                                                    message: `---"${image_path}" has been successfuly inserted on all selected nodes and set to boot from it.---`
-                                                                                });
-                                                                        }
-                                                                    }
-                                                                });
-                                                        }
-                                                    })
-
-                                            } else {
+                                            })
+                                    } else {
+                                        reject({
+                                            success: false,
+                                            message: response.message
+                                        });
+                                    }
+                                })
+                                .catch(error => {
+                                    console.log(`CATCH in ejectVirtualMediaCD: ${error.message}`);
+                                    reject({
+                                        success: false,
+                                        message: `CATCH in ejectVirtualMediaCD: ${error.message}`
+                                    });
+                                })
+                        } else {
+                            insertVirtualMediaCD(idrac_ip, image_path)
+                                .then(response => {
+                                    console.log(`insertVirtualMediaCD result for ${idrac_ip} is: ${response.message}`);
+                                    if (response.success) {
+                                        // deleteJobQueue(idrac_ip, "CLEARALL")
+                                        //     .then(response => {
+                                        //         console.log(`deleteJobQueue result for ${idrac_ip} is: ${response.message}`);
+                                        //         if (response.success) {
+                                        setNextOneTimeBootVirtualMediaDevice(idrac_ip)
+                                            .then(response => {
+                                                console.log(`setNextOneTimeBootVirtualMediaDevice result for ${idrac_ip} is: ${response.message}`);
+                                                if (!response.success) {
+                                                    reject({
+                                                        success: false,
+                                                        message: response.message
+                                                    });
+                                                } else {
+                                                    insertedCounter++;
+                                                    if (insertedCounter == idrac_ips.length) {
+                                                        if (idrac_ips.length == 1)
+                                                            resolve({
+                                                                success: true,
+                                                                message: `---"${image_path}" has been successfuly inserted on the selected node and set to boot from it.---`
+                                                            });
+                                                        else
+                                                            resolve({
+                                                                success: true,
+                                                                message: `---"${image_path}" has been successfuly inserted on all selected nodes and set to boot from it.---`
+                                                            });
+                                                    }
+                                                }
+                                            })
+                                            .catch(error => {
+                                                console.log(`CATCH in setNextOneTimeBootVirtualMediaDevice: ${error.message}`);
                                                 reject({
                                                     success: false,
-                                                    message: response.message
+                                                    message: `CATCH in setNextOneTimeBootVirtualMediaDevice: ${error.message}`
                                                 });
-                                            }
-                                        })
-                                        .catch(error => {
-                                            console.log(`CATCH in insertVirtualMediaOnNodes: ${error.message}`);
-                                            reject({
-                                                success: false,
-                                                message: `CATCH in insertVirtualMediaOnNodes: ${error.message}`
                                             });
-                                        })
-                                        .catch(error => {
-                                            console.log(`CATCH in insertVirtualMediaCD: ${error.message}`);
-                                            reject({
-                                                success: false,
-                                                message: `CATCH in insertVirtualMediaCD: ${error.message}`
-                                            });
-                                        })
-                                }
-                            })
-                            .catch(error => {
-                                console.log(`CATCH in insertVirtualMediaCD: ${error.message}`);
-                                reject({
-                                    success: false,
-                                    message: `CATCH in insertVirtualMediaCD: ${error.message}`
-                                });
-                            })
-
-                    } else {
+                                        //     }
+                                        // })
+                                        // .catch(error => {
+                                        //     console.log(`CATCH in deleteJobQueue: ${error.message}`);
+                                        //     reject({
+                                        //         success: false,
+                                        //         message: `CATCH in deleteJobQueue: ${error.message}`
+                                        //     });
+                                        // });
+                                    } else {
+                                        reject({
+                                            success: false,
+                                            message: response.message
+                                        });
+                                    }
+                                })
+                                .catch(error => {
+                                    console.log(`CATCH in insertVirtualMediaOnNodes: ${error.message}`);
+                                    reject({
+                                        success: false,
+                                        message: `CATCH in insertVirtualMediaOnNodes: ${error.message}`
+                                    });
+                                })
+                                .catch(error => {
+                                    console.log(`CATCH in insertVirtualMediaCD: ${error.message}`);
+                                    reject({
+                                        success: false,
+                                        message: `CATCH in insertVirtualMediaCD: ${error.message}`
+                                    });
+                                })
+                        }
+                    })
+                    .catch(error => {
+                        console.log(`CATCH in checkVirtualMediaCdStatus: ${error.message}`);
                         reject({
                             success: false,
-                            message: `iDRAC version installed on ${idrac_ip} does not support this functionality via Redfish`
+                            message: `CATCH in checkVirtualMediaCdStatus: ${error.message}`
                         });
-                    }
-                })
-                .catch(error => {
-                    console.log(`CATCH in insertVirtualMediaCD: ${error.message}`);
-                    reject({
-                        success: false,
-                        message: `CATCH in insertVirtualMediaCD: ${error.message}`
-                    });
-                });
-        });
-    });
-}
+                    })
 
+                // } else {
+                //     reject({
+                //         success: false,
+                //         message: `iDRAC version installed on ${idrac_ip} does not support this functionality via Redfish`
+                //     });
+                // }
+                // })
+                // .catch(error => {
+                //     console.log(`CATCH in insertVirtualMediaCD: ${error.message}`);
+                //     reject({
+                //         success: false,
+                //         message: `CATCH in insertVirtualMediaCD: ${error.message}`
+                //     });
+                // });
+            });
+        } catch (error) {
+            console.log(`CATCH in insertVirtualMediaOnNodes: ${error.message}`);
+            reject({
+                success: false,
+                message: `CATCH in insertVirtualMediaOnNodes: ${error.message}`
+            });
+        }
+    });
+} 
+  
 // Run main/test module's functions >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 // Array with two iDRAC IPs, one w/new fw w/support for RF and another without
 // // const ip_arr = ["100.80.144.128", "100.80.148.61"]
@@ -1163,7 +1197,7 @@ function insertVirtualMediaOnNodes(idrac_ips, image_path) {
 // let user_name = "nutanix_admin";
 // let user_pass = "raid4us!";
 // let idrac_ip = "100.80.144.128";
-// let img_path = "cifs://nutanix_admin:raid4us!@10.211.4.215/dropbox/dl/WIMs/XC/RASR_BMR_4.1_Test_Only_For_XC_Automation.iso";
+// let img_path = "cifs://SVC_ Auto_Image:MustChange2!@10.211.4.215/dropbox/dl/WIMs/XC/RASR_BMR_4.0_Test_Only_For_XC_Automation.iso";
 
 // // Example of calling mountNetworkImageOnNodes then rebootSelectedNodes functions from server.js
 // mountNetworkImageOnNodes(ip_arr, share_ip, share_type, share_name, image_name, user_name, user_pass)
@@ -1192,7 +1226,6 @@ function insertVirtualMediaOnNodes(idrac_ips, image_path) {
 //     .then(response => console.log(response.message))
 //     .catch(error => console.log(error.message));
 
-
 // ip_arr.forEach(idrac_ip => {
 //     checkRedfishSupport(idrac_ip)
 //         .then(response => {
@@ -1200,43 +1233,74 @@ function insertVirtualMediaOnNodes(idrac_ips, image_path) {
 //             if (response.success === true) {
 //                 checkVirtualMediaCdStatus(idrac_ip)
 //                     .then(response => {
-//                         console.log(response.message);
-//                         // if (response.success === true) {
-//                         //     response => response.json();
-//                         //     console.log(`Virtual Media on ${idrac_ip} is inserted`); // and here the contents: ${response.data}`);
-//                         // }
-//                         // else
-//                         //     console.log(`Virtual Media on ${idrac_ip} is ejected`);
+//                         console.log("checkVirtualMediaCdStatus response message: " + response.message);
+//                         if (response.message === true) {
+//                             response => response.json();
+//                             console.log(`Virtual Media on ${idrac_ip} is inserted`); // and here the contents: ${response.data}`);
+//                             ejectVirtualMediaCD(idrac_ip)
+//                                 .then(response => {
+//                                     console.log("ejectVirtualMediaCD response: " + response.message);
+//                                     if (response.success === false) {
+//                                         console.log(`FAIL: ejectVirtualMediaCD failed on ${idrac_ip}`);
+//                                     }
+//                                 })
+//                         }
+//                         else {
+//                             console.log(`Virtual Media on ${idrac_ip} is ejected`);
+//                         }
+
+//                         insertVirtualMediaCD(idrac_ip, img_path)
+//                             .then(response => {
+//                                 if (response.success === true) {
+//                                     insertedCounter++;
+//                                     if (insertedCounter === ip_arr.length) {
+//                                         rebootSelectedNodes(ip_arr)
+//                                             .then(response => {
+//                                                 if (response.success === true) {
+//                                                     console.log("All nodes rebooted!");
+//                                                 } else {
+//                                                     console.log("There were issues rebooting nodes: " + response.message);
+//                                                 }
+//                                             })
+//                                             .catch(error => {
+//                                                 console.log(`FAIL: rebootSelectedNodes for ${ip_arr} failed: ${error.message}`);
+//                                             })
+//                                     }
+//                                 }
+//                             })
+//                             .catch(error => {
+//                                 console.log(`FAIL: insertVirtualMediaCD for ${idrac_ip} failed: ${error.message}`);
+//                             })
 //                     })
 //                     .catch(error => {
 //                         console.log(`FAIL: checkVirtualMediaCdStatus for ${idrac_ip} failed: ${error.message}`);
 //                     })
-//                     .then(
-//                         checkAttachStatus(idrac_ip)
-//                             .then(response => {
-//                                 console.log(`checkAttachStatus result for ${idrac_ip}: ${response.message}`);
-//                                 if (response.message === "Attached") {
-//                                     // disconnectNetworkIsoImage(idrac_ip)
-//                                     //     .then(response => {
-//                                     //         console.log(`disconnectNetworkIsoImage result: ${response.message}`);
-//                                     //     })
+//                 // .then(
+//                 //     checkAttachStatus(idrac_ip)
+//                 //         .then(response => {
+//                 //             console.log(`checkAttachStatus result for ${idrac_ip}: ${response.message}`);
+//                 //             if (response.message === "Attached") {
+//                 //                 // disconnectNetworkIsoImage(idrac_ip)
+//                 //                 //     .then(response => {
+//                 //                 //         console.log(`disconnectNetworkIsoImage result: ${response.message}`);
+//                 //                 //     })
 
-//                                     rebootSystem(idrac_ip)
-//                                         .then(response => {
-//                                             console.log(`rebootSystem result: ${response.message}`);
-//                                         })
-//                                 }
-//                                 else {
-//                                     connectNetworkIsoImage(idrac_ip, share_ip, share_type, share_name, image_name, user_name, user_pass)
-//                                         .then(response => {
-//                                             console.log(`connectNetworkIsoImage result: ${response.message}`);
-//                                         })
-//                                 }
-//                             })
-//                             .catch(error => {
-//                                 console.log(`FAIL: checkAttachStatus for ${idrac_ip} failed: ${error.message}`);
-//                             })
-//                     )
+//                 //                 rebootSystem(idrac_ip)
+//                 //                     .then(response => {
+//                 //                         console.log(`rebootSystem result: ${response.message}`);
+//                 //                     })
+//                 //             }
+//                 //             else {
+//                 //                 connectNetworkIsoImage(idrac_ip, share_ip, share_type, share_name, image_name, user_name, user_pass)
+//                 //                     .then(response => {
+//                 //                         console.log(`connectNetworkIsoImage result: ${response.message}`);
+//                 //                     })
+//                 //             }
+//                 //         })
+//                 //         .catch(error => {
+//                 //             console.log(`FAIL: checkAttachStatus for ${idrac_ip} failed: ${error.message}`);
+//                 //         })
+//                 // )
 //             }
 //         })
 //         .catch(error => {
