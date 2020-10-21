@@ -187,31 +187,23 @@ router.post("/bmrFactoryImaging", (req, res) => {
   // let bmr_password = bmr_payload_values[4];
 
   // Get BMR info from a text file
-  [share_ip, share_name, share_type, bmr_username, bmr_password] = readLDfile(
-    bmrValues
-  );
+  [share_name, bmr_username, bmr_password, share_path] = readLDfile(bmrValues);
+
+  let image_path = `${share_path}${image_name}`;
+  console.log("Here is the image path:", image_path);
 
   // Mount BMR ISO
   // AZAT SCRIPTS START
   if (
     ip_arr !== "" &&
-    share_ip !== "" &&
     share_name !== "" &&
-    share_type !== "" &&
     image_name !== "" &&
     bmr_username !== "" &&
-    bmr_password !== ""
+    bmr_password !== "" &&
+    share_path !== ""
   ) {
     bmrIsoProcess
-      .mountNetworkImageOnNodes(
-        ip_arr,
-        share_ip,
-        share_type,
-        share_name,
-        image_name,
-        bmr_username,
-        bmr_password
-      )
+      .insertVirtualMediaOnNodes(ip_arr, image_path)
       .then((response) => {
         console.log(response.message);
         // If ISO mount successful, make lclog comments with BMR info on each iDRAC
