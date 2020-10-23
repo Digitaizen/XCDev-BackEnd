@@ -175,17 +175,6 @@ router.post("/bmrFactoryImaging", (req, res) => {
   let block_name = req.body.selectedFactoryBlockOption;
   let hypervisor_name = req.body.selectedHypervisorOption;
 
-  // let bmr_payload_values = fs
-  //   .readFileSync("bmr_payload_values.txt")
-  //   .toString()
-  //   .replace(/\r/g, "")
-  //   .split("\n");
-  // let share_ip = bmr_payload_values[0];
-  // let share_name = bmr_payload_values[1];
-  // let share_type = bmr_payload_values[2];
-  // let bmr_username = bmr_payload_values[3];
-  // let bmr_password = bmr_payload_values[4];
-
   // Get BMR info from a text file
   [share_name, bmr_username, bmr_password, share_path] = readLDfile(bmrValues);
 
@@ -202,8 +191,7 @@ router.post("/bmrFactoryImaging", (req, res) => {
     bmr_password !== "" &&
     share_path !== ""
   ) {
-    bmrIsoProcess
-      .insertVirtualMediaOnNodes(ip_arr, image_path)
+    bmrIsoProcess.insertVmCdOnNodes(ip_arr, image_path)
       .then((response) => {
         console.log(response.message);
         // If ISO mount successful, make lclog comments with BMR info on each iDRAC
@@ -241,19 +229,66 @@ router.post("/bmrFactoryImaging", (req, res) => {
             console.log(responses);
 
             // After lclog comments finish, reboot each server
-            bmrIsoProcess.rebootSelectedNodes(ip_arr).then((response) => {
-              console.log(response.message);
+            let setBootCounter = 0;
+            ip_arr.forEach(idrac_ip => {
+              bmrIsoProcess.setNextOneTimeBootVirtualMediaDevice(idrac_ip)
+                .then(response => {
+                  console.log(`setNextOneTimeBootVirtualMediaDevice result for ${idrac_ip} is: ${response.message}`);
+                  if (response.success) {
+                    if (setBootCounter == ip_arr.length) {
+                      if (ip_arr.length == 1)
+                        console.log(`---"${idrac_ip}" has been successfuly set to boot from the inserted VM-CD.---`); //debugging
+                        // resolve({
+                        //   success: true,
+                        //   message: `---"${idrac_ip}" has been successfuly set to boot from the inserted VM-CD.---`
+                        // });
+                      else
+                        console.log(`---"${idrac_ip}" have been successfuly set to boot from the inserted VM-CD.---`); //debugging
+                        // resolve({
+                        //   success: true,
+                        //   message: `---"${ip_arr}" have been successfuly set to boot from the inserted VM-CD.---`
+                        // });
+                      
+                      bmrIsoProcess.rebootSelectedNodes(ip_arr)
+                        .then((response) => {
+                          console.log(response.message);
 
-              if (response.success) {
-                res
-                  .status(200)
-                  .json({ success: true, message: response.message });
-              } else {
-                res
-                  .status(500)
-                  .json({ success: false, message: response.message });
-              }
-            });
+                          if (response.success) {
+                            res
+                              .status(200)
+                              .json({ success: true, message: response.message });
+                          } else {
+                            res
+                              .status(500)
+                              .json({ success: false, message: response.message });
+                          };
+                        })
+                        .catch(error => {
+                          console.log(`CATCH in rebootSelectedNodes: ${error.message}`);
+                          // reject({
+                          //   success: false,
+                          //   message: `CATCH in rebootSelectedNodes: ${error.message}`
+                          // });
+                          res
+                            .status(500)
+                            .json({ success: false, message: response.message });
+                        });
+                    };                                                  
+                  } else {
+                    reject({
+                      success: false,
+                      message: response.message
+                    });
+                  };
+                })
+                .catch(error => {
+                  console.log(`CATCH in setNextOneTimeBootVirtualMediaDevice: ${error.message}`);
+                  reject({
+                    success: false,
+                    message: `CATCH in setNextOneTimeBootVirtualMediaDevice: ${error.message}`
+                  });
+                });
+            });            
           });
         } else {
           res.status(500).json({ success: false, message: response.message });
