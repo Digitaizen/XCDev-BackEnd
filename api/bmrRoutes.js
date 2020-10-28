@@ -242,7 +242,7 @@ router.post("/bmrFactoryImaging", (req, res) => {
                             if (ip_arr.length == 1)
                               console.log(`---"${idrac_ip}" has been successfuly set to boot from the inserted VM-CD.---`); //debugging
                             else
-                              console.log(`---"${idrac_ip}" have been successfuly set to boot from the inserted VM-CD.---`); //debugging
+                              console.log(`---"${ip_arr}" have been successfuly set to boot from the inserted VM-CD.---`); //debugging
                             
                             // Now, reboot all the nodes
                             bmrIsoProcess.rebootSelectedNodes(ip_arr)

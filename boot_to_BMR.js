@@ -1224,6 +1224,9 @@ function insertVmCdOnNodes(idrac_ips, image_path) {
 		let insertedCounter = 0;
 
 		try {
+      // Get only the image name from the image_path string passed-in
+      let image_name = image_path.substring(image_path.lastIndexOf('/')+1);
+
 			idrac_ips.forEach(idrac_ip => {
 				checkVirtualMediaCdStatus(idrac_ip)
 					.then(response => {
@@ -1247,12 +1250,12 @@ function insertVmCdOnNodes(idrac_ips, image_path) {
                                   if (idrac_ips.length == 1)
                                     resolve({
                                       success: true,
-                                      message: `---"${image_path}" has been successfuly inserted on ${idrac_ip}.---`
+                                      message: `---"${image_name}" has been successfuly inserted on ${idrac_ip}.---`
                                     });
                                   else
                                     resolve({
                                       success: true,
-                                      message: `---"${image_path}" has been successfuly inserted on ${idrac_ips}.---`
+                                      message: `---"${image_name}" has been successfuly inserted on ${idrac_ips}.---`
                                     });
                                 };
 
@@ -1327,12 +1330,12 @@ function insertVmCdOnNodes(idrac_ips, image_path) {
                         if (idrac_ips.length == 1)
                           resolve({
                             success: true,
-                            message: `---"${image_path}" has been successfuly inserted on ${idrac_ip}.---`
+                            message: `---"${image_name}" has been successfuly inserted on ${idrac_ip}.---`
                           });
                         else
                           resolve({
                             success: true,
-                            message: `---"${image_path}" has been successfuly inserted on ${idrac_ips}.---`
+                            message: `---"${image_name}" has been successfuly inserted on ${idrac_ips}.---`
                           });
                       };
 
