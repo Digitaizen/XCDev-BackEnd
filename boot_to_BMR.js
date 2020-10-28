@@ -301,7 +301,7 @@ function rebootSystem(node_ip, reboot_type) {
 			.catch(error => {
 				reject({
 					success: false,
-					message: `FAIL: Fetch in rebootSystem failed on ${node_ip}: ${error}`
+					message: `FAIL: Fetch in rebootSystem failed with ${error}`
 				});
 			});
 	});
@@ -962,8 +962,10 @@ function rebootSelectedNodes(idrac_ips) {
 						if (response.message == "On")
 							rebootType = "ForceRestart";
 						else
-							rebootType = "PushPowerButton";
-						console.log(`rebootType for ${idrac_ip} set to: ${rebootType}`);
+              rebootType = "PushPowerButton";
+              
+            console.log(`rebootType for ${idrac_ip} set to: ${rebootType}`);
+            
 						rebootSystem(idrac_ip, rebootType)
 							.then((response) => {
 								console.log(`rebootSystem result for ${idrac_ip} is: ${response.message}`);
@@ -973,12 +975,12 @@ function rebootSelectedNodes(idrac_ips) {
 										if (idrac_ips.length == 1)
 											resolve({
 												success: true,
-												message: `---Selected node has been successfuly rebooted.---`
+												message: `---${idrac_ip} has been successfuly rebooted.---`
 											});
 										else
 											resolve({
 												success: true,
-												message: `---All selected nodes have been successfuly rebooted.---`
+												message: `---${idrac_ips} have been successfuly rebooted.---`
 											});
 									}
 								} else reject({
@@ -987,10 +989,10 @@ function rebootSelectedNodes(idrac_ips) {
 								});
 							})
 							.catch((error) => {
-								console.log(`CATCH in rebootSelectedNodes: ${error.message}`);
+								console.log(`CATCH in rebootSelectedNodes on ${idrac_ip}: ${error.message}`);
 								reject({
 									success: false,
-									message: `CATCH in rebootSelectedNodes: ${error.message}`
+									message: `CATCH in rebootSelectedNodes on ${idrac_ip}: ${error.message}`
 								});
 							})
 					}
@@ -1245,12 +1247,12 @@ function insertVmCdOnNodes(idrac_ips, image_path) {
                                   if (idrac_ips.length == 1)
                                     resolve({
                                       success: true,
-                                      message: `---"${image_path}" has been successfuly inserted on the selected node.---`
+                                      message: `---"${image_path}" has been successfuly inserted on ${idrac_ip}.---`
                                     });
                                   else
                                     resolve({
                                       success: true,
-                                      message: `---"${image_path}" has been successfuly inserted on all selected nodes.---`
+                                      message: `---"${image_path}" has been successfuly inserted on ${idrac_ips}.---`
                                     });
                                 };
 
@@ -1295,17 +1297,24 @@ function insertVmCdOnNodes(idrac_ips, image_path) {
                             // console.log(`CATCH in insertVirtualMediaCD: ${error.message}`);
                             reject({
                               success: false,
-                              message: `CATCH in insertVirtualMediaCD: ${error.message}`
+                              message: `CATCH in insertVirtualMediaCD on ${idrac_ip}: ${error.message}`
                             });
                           })
                       }
                     })
+                    .catch(error => {
+                      console.log(`CATCH in checkVirtualMediaCdStatus on ${idrac_ip}: ${error.message}`);
+                      reject({
+                        success: false,
+                        message: `CATCH in checkVirtualMediaCdStatus on ${idrac_ip}: ${error.message}`
+                      });
+                    })
 								})
 								.catch(error => {
-									console.log(`CATCH in ejectVirtualMediaCD: ${error.message}`);
+									console.log(`CATCH in ejectVirtualMediaCD on ${idrac_ip}: ${error.message}`);
 									reject({
 										success: false,
-										message: `CATCH in ejectVirtualMediaCD: ${error.message}`
+										message: `CATCH in ejectVirtualMediaCD on ${idrac_ip}: ${error.message}`
 									});
 								})
 						} else {
@@ -1318,12 +1327,12 @@ function insertVmCdOnNodes(idrac_ips, image_path) {
                         if (idrac_ips.length == 1)
                           resolve({
                             success: true,
-                            message: `---"${image_path}" has been successfuly inserted on the selected node.---`
+                            message: `---"${image_path}" has been successfuly inserted on ${idrac_ip}.---`
                           });
                         else
                           resolve({
                             success: true,
-                            message: `---"${image_path}" has been successfuly inserted on all selected nodes.---`
+                            message: `---"${image_path}" has been successfuly inserted on ${idrac_ips}.---`
                           });
                       };
 
@@ -1365,19 +1374,19 @@ function insertVmCdOnNodes(idrac_ips, image_path) {
 									}
 								})
 								.catch(error => {
-									console.log(`CATCH in insertVirtualMediaCD: ${error.message}`);
+									console.log(`CATCH in insertVirtualMediaCD on ${idrac_ip}: ${error.message}`);
 									reject({
 										success: false,
-										message: `CATCH in insertVirtualMediaCD: ${error.message}`
+										message: `CATCH in insertVirtualMediaCD on ${idrac_ip}: ${error.message}`
 									});
 								})
 						}
 					})
 					.catch(error => {
-						console.log(`CATCH in checkVirtualMediaCdStatus: ${error.message}`);
+						console.log(`CATCH in checkVirtualMediaCdStatus on ${idrac_ip}: ${error.message}`);
 						reject({
 							success: false,
-							message: `CATCH in checkVirtualMediaCdStatus: ${error.message}`
+							message: `CATCH in checkVirtualMediaCdStatus on ${idrac_ip}: ${error.message}`
 						});
 					})
 			});
@@ -1394,7 +1403,7 @@ function insertVmCdOnNodes(idrac_ips, image_path) {
 // Run main/test module's functions >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 // Array with two iDRAC IPs, one w/new fw w/support for RF and another without
 // // const ip_arr = ["100.80.144.128", "100.80.148.61"]
-// const ip_arr = ["100.80.147.112", "100.80.144.131"]; //["100.80.144.131"]; //["100.80.147.112"]; //["100.80.144.128"];
+// const ip_arr = ["100.80.145.163"]; //["100.80.147.112", "100.80.144.131"]; //["100.80.144.131"]; //["100.80.147.112"]; //["100.80.144.128"];
 // let share_ip = "10.211.4.215";
 // let share_type = "CIFS";
 // let share_name = "Nightflyer/_14G/BMR.ISO";
