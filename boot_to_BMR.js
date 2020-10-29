@@ -538,7 +538,8 @@ function ejectVirtualMediaCD(node_ip) {
 
 		// Make fetch call on the URL
 		fetch(url, options)
-			// .then(response => console.log(response))
+      // .then(response => console.log(response))
+      .then(sleep(2000))
 			.then((response) => {
 				if (response.status === 204) {
           resolve({
