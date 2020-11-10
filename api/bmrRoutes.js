@@ -8,9 +8,68 @@ const bmrValues = "bmr_payload_values.txt";
 const bmrIsoProcess = require("../boot_to_BMR");
 const { exec, execFile } = require("child_process");
 const Shell = require("node-powershell");
+const { search } = require("./serverRoutes");
 
 // Global variables
 const dbColl_Servers = "servers";
+
+// Write new data to a specific entry based on service tag
+function writeToCollection(
+  dbObject,
+  collectionName,
+  searchKey,
+  searchValue,
+  dataObject
+) {
+  let searchObject = {};
+  searchObject[searchKey] = searchValue;
+
+  return new Promise((resolve, reject) => {
+    dbObject.collection(collectionName).findOne(searchObject, (err, res) => {
+      if (err) {
+        console.log(err);
+      }
+      // If an entry matches the search query, update the entry
+      if (res !== null) {
+        dbObject.collection(collectionName).updateOne(
+          searchObject,
+          {
+            $set: dataObject,
+          },
+          (err, res) => {
+            if (err) {
+              reject({
+                success: false,
+                message: "Error on updating record: " + err,
+              });
+            } else {
+              resolve({ success: true, message: "Updated the record." });
+            }
+          }
+        );
+        // If no entry matches the search query, add a new entry
+      } else {
+        if (!err) {
+          // Add search key and value to data being inserted
+          dataObject[searchKey] = searchValue;
+
+          dbObject
+            .collection(collectionName)
+            .insertOne(dataObject, { checkKeys: false }, (err, res) => {
+              if (err) {
+                reject({
+                  success: false,
+                  message: "Error on inserting record: " + err,
+                });
+              } else {
+                resolve({ success: true, message: "Inserted new record." });
+              }
+            });
+        }
+      }
+    });
+  });
+}
 
 // Read text file, remove spaces and empty lines, and return an array of text lines
 function readLDfile(fName) {
@@ -171,9 +230,14 @@ router.post("/bmrFactoryImaging", (req, res) => {
   let ip_arr = req.body.selectedRowData.map((server) => {
     return server.ip;
   });
+  let server_object_arr = req.body.selectedRowData.map((server) => {
+    return { ip: server.ip, serviceTag: server.serviceTag };
+  });
   let image_name = req.body.selectedBmrIsoOption;
   let block_name = req.body.selectedFactoryBlockOption;
   let hypervisor_name = req.body.selectedHypervisorOption;
+
+  let _db = mongoUtil.getDb();
 
   // Get BMR info from a text file
   [share_name, bmr_username, bmr_password, share_path] = readLDfile(bmrValues);
@@ -184,34 +248,112 @@ router.post("/bmrFactoryImaging", (req, res) => {
   // Mount BMR ISO
   // AZAT SCRIPTS START
   if (
-      ip_arr !== "" &&
-      share_name !== "" &&
-      image_name !== "" &&
-      bmr_username !== "" &&
-      bmr_password !== "" &&
-      share_path !== ""
-    ) {
-        bmrIsoProcess.insertVmCdOnNodes(ip_arr, image_path)
-          .then((response) => {
-            console.log(response.message);
-            // If ISO mount successful, make lcLog comments with BMR info on each iDRAC
-            if (response.success) {
+    ip_arr !== "" &&
+    share_name !== "" &&
+    image_name !== "" &&
+    bmr_username !== "" &&
+    bmr_password !== "" &&
+    share_path !== ""
+  ) {
+    bmrIsoProcess
+      .insertVmCdOnNodes(ip_arr, image_path)
+      .then((response) => {
+        console.log(response.message);
+        // If ISO mount successful, make lcLog comments with BMR info on each iDRAC
+        if (response.success) {
+          let mountUpdates = [];
+
+          // Update BMR status in servers collection
+          server_object_arr.forEach((server) => {
+            mountUpdates.push(
+              writeToCollection(
+                _db,
+                dbColl_Servers,
+                "serviceTag",
+                server.serviceTag,
+                {
+                  bmrStatus: `ISO mount successful for server ${server.ip}`,
+                }
+              )
+                .then((response) => {
+                  if (response.success) {
+                    resolve({
+                      success: true,
+                      message: `ISO mount successful for server ${server.ip}`,
+                    });
+                  } else {
+                    reject({
+                      success: false,
+                      message: `BMR Status failed to update for ${server.ip}`,
+                    });
+                  }
+                })
+                .catch((error) => {
+                  console.log(
+                    `CATCH on writeToCollection: ${error.statusText}`
+                  );
+                })
+            );
+          });
+
+          // Execute each BMR status update query
+          Promise.all(mountUpdates)
+            .then((responses) => {
+              console.log(responses);
+              // })
+              // .catch((error) => {
+              //   console.log(
+              //     `CATCH in PromiseAll mount updates: ${error.message}`
+              //   );
+              //   res.status(500).json({ success: false, message: error.message });
+              // });
+
               let lcLogs = [];
+              // let _db = mongoUtil.getDb();
 
               // Define calls to lcLog comment script for each server
-              for (const ipAddress of ip_arr) {
+              for (const server of server_object_arr) {
                 // Wrap script calls in Promises and store them in 'lcLogs' array
                 lcLogs.push(
                   new Promise((resolve, reject) => {
                     const myShellScript = exec(
-                      `sh bmr-parm.sh ${ipAddress} ${block_name} ${hypervisor_name} ${share_name} ${bmr_username} ${bmr_password}`
+                      `sh bmr-parm.sh ${server.ip} ${block_name} ${hypervisor_name} ${share_name} ${bmr_username} ${bmr_password}`
                     );
                     myShellScript.stdout.on("data", (data) => {
+                      // Update BMR status in servers collection
+                      writeToCollection(
+                        _db,
+                        dbColl_Servers,
+                        "serviceTag",
+                        server.serviceTag,
+                        {
+                          bmrStatus: `Created lcLog comment for server ${server.ip} with seq id ${data}`,
+                        }
+                      )
+                        .then((response) => {
+                          if (response.success) {
+                            resolve({
+                              success: true,
+                              message: `Created lcLog comment for server ${server.ip} with seq id ${data}`,
+                            });
+                          } else {
+                            reject({
+                              success: false,
+                              message: `BMR Status failed to update for ${server.ip}`,
+                            });
+                          }
+                        })
+                        .catch((error) => {
+                          console.log(
+                            `CATCH on writeToCollection: ${error.statusText}`
+                          );
+                        });
+
                       // console.log(data);
-                      resolve({
-                        success: true,
-                        message: `Created lcLog comment for server ${ipAddress} with seq id ${data}`,
-                      });
+                      // resolve({
+                      //   success: true,
+                      //   message: `Created lcLog comment for server ${server.ip} with seq id ${data}`,
+                      // });
                     });
                     myShellScript.stderr.on("data", (data) => {
                       // console.error(data);
@@ -231,81 +373,104 @@ router.post("/bmrFactoryImaging", (req, res) => {
 
                   // After lcLog comments finish, loop through all selected nodes and set them to boot once from the VM-CD.
                   let setBootCounter = 0;
-                  ip_arr.forEach(idrac_ip => {
-                    bmrIsoProcess.setNextOneTimeBootVirtualMediaDevice(idrac_ip)
-                      .then(response => {
-                        console.log(`setNextOneTimeBootVirtualMediaDevice result for ${idrac_ip} is: ${response.message}`);
+                  ip_arr.forEach((idrac_ip) => {
+                    bmrIsoProcess
+                      .setNextOneTimeBootVirtualMediaDevice(idrac_ip)
+                      .then((response) => {
+                        console.log(
+                          `setNextOneTimeBootVirtualMediaDevice result for ${idrac_ip} is: ${response.message}`
+                        );
                         if (response.success) {
                           setBootCounter++;
                           // If all selected nodes are set to boot proceed to the next step of rebooting them
                           if (setBootCounter == ip_arr.length) {
                             if (ip_arr.length == 1)
-                              console.log(`---"${idrac_ip}" has been successfuly set to boot from the inserted VM-CD.---`); //debugging
+                              console.log(
+                                `---"${idrac_ip}" has been successfuly set to boot from the inserted VM-CD.---`
+                              );
+                            //debugging
                             else
-                              console.log(`---"${ip_arr}" have been successfuly set to boot from the inserted VM-CD.---`); //debugging
-                            
+                              console.log(
+                                `---"${ip_arr}" have been successfuly set to boot from the inserted VM-CD.---`
+                              ); //debugging
+
                             // Now, reboot all the nodes
-                            bmrIsoProcess.rebootSelectedNodes(ip_arr)
+                            bmrIsoProcess
+                              .rebootSelectedNodes(ip_arr)
                               .then((response) => {
                                 console.log(response.message);
 
                                 if (response.success) {
-                                  res
-                                    .status(200)
-                                    .json({ success: true, message: response.message });
+                                  res.status(200).json({
+                                    success: true,
+                                    message: response.message,
+                                  });
                                 } else {
-                                  res
-                                    .status(500)
-                                    .json({ success: false, message: response.message });
-                                };
+                                  res.status(500).json({
+                                    success: false,
+                                    message: response.message,
+                                  });
+                                }
                               })
-                              .catch(error => {
-                                console.log(`CATCH in rebootSelectedNodes: ${error.message}`);
-                                res
-                                  .status(500)
-                                  .json({ success: false, message: response.message });
+                              .catch((error) => {
+                                console.log(
+                                  `CATCH in rebootSelectedNodes: ${error.message}`
+                                );
+                                res.status(500).json({
+                                  success: false,
+                                  message: response.message,
+                                });
                               });
-                          };                                                  
+                          }
                         } else {
                           // console.log(`Failure in setNextOneTimeBootVirtualMediaDevice on ${idrac_ip}: ${response.message}`);
-                          res
-                            .status(500)
-                            .json({ success: false, message: response.message });
-                        };
+                          res.status(500).json({
+                            success: false,
+                            message: response.message,
+                          });
+                        }
                       })
-                      .catch(error => {
-                        console.log(`CATCH in setNextOneTimeBootVirtualMediaDevice on ${idrac_ip}: ${error.message}`);
+                      .catch((error) => {
+                        console.log(
+                          `CATCH in setNextOneTimeBootVirtualMediaDevice on ${idrac_ip}: ${error.message}`
+                        );
                         res
                           .status(500)
                           .json({ success: false, message: response.message });
                       });
-                  });            
+                  });
                 })
-                .catch(error => {
+                .catch((error) => {
                   console.log(`CATCH in PromiseAll lcLogs: ${error.message}`);
                   res
                     .status(500)
                     .json({ success: false, message: error.message });
-                })
-            } else {
-              console.log(`Failure in insertVmCdOnNodes: ${response.message}`);
-              res
-                .status(500)
-                .json({ success: false, message: response.message });
-            }
-          })
-          .catch(error => {
-            console.log(`CATCH in bmrRoutes on insertVmCdOnNodes: ${error.message}`);
-            res
-              .status(500)
-              .json({ success: false, message: error.message });
-          })
-      } else {
-        console.log(`Missing one or more BMR values.`);
-        res
-          .status(500)
-          .json({ success: false, message: `FAIL: Missing one or more BMR values.` });
-      }
+                });
+            })
+            .catch((error) => {
+              console.log(
+                `CATCH in PromiseAll mount updates: ${error.message}`
+              );
+              res.status(500).json({ success: false, message: error.message });
+            });
+        } else {
+          console.log(`Failure in insertVmCdOnNodes: ${response.message}`);
+          res.status(500).json({ success: false, message: response.message });
+        }
+      })
+      .catch((error) => {
+        console.log(
+          `CATCH in bmrRoutes on insertVmCdOnNodes: ${error.message}`
+        );
+        res.status(500).json({ success: false, message: error.message });
+      });
+  } else {
+    console.log(`Missing one or more BMR values.`);
+    res.status(500).json({
+      success: false,
+      message: `FAIL: Missing one or more BMR values.`,
+    });
+  }
 });
 
 module.exports = router;
