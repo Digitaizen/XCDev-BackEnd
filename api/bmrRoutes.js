@@ -266,33 +266,35 @@ router.post("/bmrFactoryImaging", (req, res) => {
           // Update BMR status in servers collection
           server_object_arr.forEach((server) => {
             mountUpdates.push(
-              writeToCollection(
-                _db,
-                dbColl_Servers,
-                "serviceTag",
-                server.serviceTag,
-                {
-                  bmrStatus: `ISO mount successful for server ${server.ip}`,
-                }
-              )
-                .then((response) => {
-                  if (response.success) {
-                    resolve({
-                      success: true,
-                      message: `ISO mount successful for server ${server.ip}`,
-                    });
-                  } else {
-                    reject({
-                      success: false,
-                      message: `BMR Status failed to update for ${server.ip}`,
-                    });
+              new Promise((resolve, reject) => {
+                writeToCollection(
+                  _db,
+                  dbColl_Servers,
+                  "serviceTag",
+                  server.serviceTag,
+                  {
+                    bmrStatus: `ISO mount successful for server ${server.ip}`,
                   }
-                })
-                .catch((error) => {
-                  console.log(
-                    `CATCH on writeToCollection: ${error.statusText}`
-                  );
-                })
+                )
+                  .then((response) => {
+                    if (response.success) {
+                      resolve({
+                        success: true,
+                        message: `ISO mount successful for server ${server.ip}`,
+                      });
+                    } else {
+                      reject({
+                        success: false,
+                        message: `BMR Status failed to update for ${server.ip}`,
+                      });
+                    }
+                  })
+                  .catch((error) => {
+                    console.log(
+                      `CATCH on mount update writeToCollection: ${error.statusText}`
+                    );
+                  });
+              })
             );
           });
 
@@ -345,7 +347,7 @@ router.post("/bmrFactoryImaging", (req, res) => {
                         })
                         .catch((error) => {
                           console.log(
-                            `CATCH on writeToCollection: ${error.statusText}`
+                            `CATCH on lclog writeToCollection: ${error.statusText}`
                           );
                         });
 
