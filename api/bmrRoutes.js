@@ -302,16 +302,8 @@ router.post("/bmrFactoryImaging", (req, res) => {
           Promise.all(mountUpdates)
             .then((responses) => {
               console.log(responses);
-              // })
-              // .catch((error) => {
-              //   console.log(
-              //     `CATCH in PromiseAll mount updates: ${error.message}`
-              //   );
-              //   res.status(500).json({ success: false, message: error.message });
-              // });
 
               let lcLogs = [];
-              // let _db = mongoUtil.getDb();
 
               // Define calls to lcLog comment script for each server
               for (const server of server_object_arr) {
@@ -350,15 +342,8 @@ router.post("/bmrFactoryImaging", (req, res) => {
                             `CATCH on lclog writeToCollection: ${error.statusText}`
                           );
                         });
-
-                      // console.log(data);
-                      // resolve({
-                      //   success: true,
-                      //   message: `Created lcLog comment for server ${server.ip} with seq id ${data}`,
-                      // });
                     });
                     myShellScript.stderr.on("data", (data) => {
-                      // console.error(data);
                       reject({
                         success: false,
                         message: data,
@@ -375,57 +360,87 @@ router.post("/bmrFactoryImaging", (req, res) => {
 
                   // After lcLog comments finish, loop through all selected nodes and set them to boot once from the VM-CD.
                   let setBootCounter = 0;
-                  ip_arr.forEach((idrac_ip) => {
+                  server_object_arr.forEach((server) => {
                     bmrIsoProcess
-                      .setNextOneTimeBootVirtualMediaDevice(idrac_ip)
+                      .setNextOneTimeBootVirtualMediaDevice(server.ip)
                       .then((response) => {
                         console.log(
-                          `setNextOneTimeBootVirtualMediaDevice result for ${idrac_ip} is: ${response.message}`
+                          `setNextOneTimeBootVirtualMediaDevice result for ${server.ip} is: ${response.message}`
                         );
                         if (response.success) {
-                          setBootCounter++;
-                          // If all selected nodes are set to boot proceed to the next step of rebooting them
-                          if (setBootCounter == ip_arr.length) {
-                            if (ip_arr.length == 1)
-                              console.log(
-                                `---"${idrac_ip}" has been successfuly set to boot from the inserted VM-CD.---`
-                              );
-                            //debugging
-                            else
-                              console.log(
-                                `---"${ip_arr}" have been successfuly set to boot from the inserted VM-CD.---`
-                              ); //debugging
+                          // Update BMR status in servers collection
+                          writeToCollection(
+                            _db,
+                            dbColl_Servers,
+                            "serviceTag",
+                            server.serviceTag,
+                            {
+                              bmrStatus: `Set next boot VM for server ${server.ip}`,
+                            }
+                          )
+                            .then((response) => {
+                              if (response.success) {
+                                setBootCounter++;
+                                // If all selected nodes are set to boot proceed to the next step of rebooting them
+                                if (setBootCounter == ip_arr.length) {
+                                  if (ip_arr.length == 1)
+                                    console.log(
+                                      `---"${server.ip}" has been successfuly set to boot from the inserted VM-CD.---`
+                                    );
+                                  //debugging
+                                  else
+                                    console.log(
+                                      `---"${ip_arr}" have been successfuly set to boot from the inserted VM-CD.---`
+                                    ); //debugging
 
-                            // Now, reboot all the nodes
-                            bmrIsoProcess
-                              .rebootSelectedNodes(ip_arr)
-                              .then((response) => {
-                                console.log(response.message);
+                                  // Now, reboot all the nodes
+                                  bmrIsoProcess
+                                    .rebootSelectedNodes(ip_arr)
+                                    .then((response) => {
+                                      console.log(response.message);
 
-                                if (response.success) {
-                                  res.status(200).json({
-                                    success: true,
-                                    message: response.message,
-                                  });
-                                } else {
-                                  res.status(500).json({
-                                    success: false,
-                                    message: response.message,
-                                  });
+                                      if (response.success) {
+                                        res.status(200).json({
+                                          success: true,
+                                          message: response.message,
+                                        });
+                                      } else {
+                                        res.status(500).json({
+                                          success: false,
+                                          message: response.message,
+                                        });
+                                      }
+                                    })
+                                    .catch((error) => {
+                                      console.log(
+                                        `CATCH in rebootSelectedNodes: ${error.message}`
+                                      );
+                                      res.status(500).json({
+                                        success: false,
+                                        message: response.message,
+                                      });
+                                    });
                                 }
-                              })
-                              .catch((error) => {
+                              } else {
                                 console.log(
-                                  `CATCH in rebootSelectedNodes: ${error.message}`
+                                  `BMR Status failed to update for ${server.ip}`
                                 );
                                 res.status(500).json({
                                   success: false,
                                   message: response.message,
                                 });
+                              }
+                            })
+                            .catch((error) => {
+                              console.log(
+                                `CATCH on set boot VM writeToCollection: ${error.statusText}`
+                              );
+                              res.status(500).json({
+                                success: false,
+                                message: error.statusText,
                               });
-                          }
+                            });
                         } else {
-                          // console.log(`Failure in setNextOneTimeBootVirtualMediaDevice on ${idrac_ip}: ${response.message}`);
                           res.status(500).json({
                             success: false,
                             message: response.message,
@@ -434,7 +449,7 @@ router.post("/bmrFactoryImaging", (req, res) => {
                       })
                       .catch((error) => {
                         console.log(
-                          `CATCH in setNextOneTimeBootVirtualMediaDevice on ${idrac_ip}: ${error.message}`
+                          `CATCH in setNextOneTimeBootVirtualMediaDevice on ${server.ip}: ${error.message}`
                         );
                         res
                           .status(500)
