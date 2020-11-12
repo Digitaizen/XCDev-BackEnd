@@ -398,12 +398,63 @@ router.post("/bmrFactoryImaging", (req, res) => {
                                     .rebootSelectedNodes(ip_arr)
                                     .then((response) => {
                                       console.log(response.message);
+                                      let rebootUpdates = [];
 
                                       if (response.success) {
-                                        res.status(200).json({
-                                          success: true,
-                                          message: response.message,
+                                        // Update BMR status in servers collection
+                                        server_object_arr.forEach((server) => {
+                                          rebootUpdates.push(
+                                            new Promise((resolve, reject) => {
+                                              writeToCollection(
+                                                _db,
+                                                dbColl_Servers,
+                                                "serviceTag",
+                                                server.serviceTag,
+                                                {
+                                                  bmrStatus: `Reboot successful for server ${server.ip}`,
+                                                }
+                                              )
+                                                .then((response) => {
+                                                  if (response.success) {
+                                                    resolve({
+                                                      success: true,
+                                                      message: `Reboot successful for server ${server.ip}`,
+                                                    });
+                                                  } else {
+                                                    reject({
+                                                      success: false,
+                                                      message: `BMR Status failed to update for ${server.ip}`,
+                                                    });
+                                                  }
+                                                })
+                                                .catch((error) => {
+                                                  console.log(
+                                                    `CATCH on reboot update writeToCollection: ${error.statusText}`
+                                                  );
+                                                });
+                                            })
+                                          );
                                         });
+
+                                        // Execute each BMR status update query
+                                        Promise.all(rebootUpdates)
+                                          .then((responses) => {
+                                            console.log(responses);
+
+                                            res.status(200).json({
+                                              success: true,
+                                              message: response.message,
+                                            });
+                                          })
+                                          .catch((error) => {
+                                            console.log(
+                                              `CATCH in PromiseAll reboot updates: ${error.message}`
+                                            );
+                                            res.status(500).json({
+                                              success: false,
+                                              message: error.message,
+                                            });
+                                          });
                                       } else {
                                         res.status(500).json({
                                           success: false,
