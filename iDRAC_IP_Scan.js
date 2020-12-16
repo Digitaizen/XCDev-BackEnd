@@ -13,14 +13,42 @@ const fs = require("fs");
 const { retry } = require("async");
 const { count } = require("console");
 const { performance } = require('perf_hooks');
+const AbortController = require("abort-controller");
 
 // Declare global variables -----------------------------------------------------------------------
+const fetchTimeout = 10000;
 // These vars are for testing
 // let set_of_ips = fs;
 // let file_idracs = "IPrangeScan-iDRACs.txt";
 // let file_others = "IPrangeScan-Others.txt";
 
 // Define module's functions ----------------------------------------------------------------------
+const fetchWithTimeout = (url, options = {}, time = 8000) => {
+  const controller = new AbortController();
+  const config = { ...options, signal: controller.signal };
+  // Cancel fetch request upon set timeout value
+  const timeout = setTimeout(() => {
+    controller.abort();
+  }, time);
+
+  return fetch(url, config)
+    .then((response) => {
+      // Check for error/success
+      if (!response.ok) {
+        throw new Error(`${response.status}: ${response.statusText}`);
+      }
+      return response;
+    })
+    .catch((error) => {
+      // Catch abort-specific error upon req cancellation and provide new message
+      if (error.name === 'AbortError') {
+        throw new Error('Response timed out');
+      }
+      // Provide details for other errors
+      throw new Error(error.message);
+    });
+}
+
 function checkForIdracURL(node_ip) {
   return new Promise((resolve, reject) => {
     // console.log("checkForIdracURL function called for ", node_ip); //debugging
@@ -40,7 +68,7 @@ function checkForIdracURL(node_ip) {
     };
 
     // Make fetch call on the URL to check if it exists
-    fetch(url, options)
+    fetchWithTimeout(url, options, fetchTimeout)
       .then((response) => {
         if (response.ok) {
           console.log(`PASS - Fetch passed on ${node_ip}: ${response.statusText}`);

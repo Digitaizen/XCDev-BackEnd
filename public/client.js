@@ -49,13 +49,8 @@ scanButton.addEventListener("click", () => {
   let resultMsg = "";
   // Notify user about wait-time in the browser window
   displayResult(
-    "Scan initiated. Please, wait as it takes a few minutes to complete, unless there's a failure."
+    "Scan initiated. Please, wait a moment..."
   );
-  // Notify user about unusually long scan time
-  setTimeout(() => {
-    console.log("..waiting on response from some servers, still scanning..");
-    displayResult("..Still waiting on some servers, please be patient.");
-  }, 186000);
 
   fetch("/findServers", {
     method: "POST",
